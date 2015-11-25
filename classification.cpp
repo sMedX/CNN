@@ -296,8 +296,81 @@ ImageType2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const typename 
   return extractVolumeFilter->GetOutput();
 }
 
+void testOn2DTile(int argc, char** argv)
+{
+  string model_file = argv[1];
+  string trained_file = argv[2];
+  string mean_file = argv[3];
+  string label_file = argv[4];
+  string test_list = argv[5];
+
+  std::cout <<
+    "model_file = " << model_file << std::endl <<
+    "trained_file =" << trained_file << std::endl <<
+    "mean_file = " << mean_file << std::endl <<
+    "label_file =" << label_file << std::endl <<
+    "test_list =" << test_list << std::endl;
+
+  std::cout << "load classifier" << std::endl;
+  ::google::InitGoogleLogging("log.txt");
+  Classifier classifier(model_file, trained_file, mean_file, label_file);
+
+  //itk::MetaImageIOFactory::RegisterOneFactory();
+
+  std::cout << "." << std::endl;
+
+  int TP = 0, FN = 0, FP = 0, TN = 0;
+
+  std::ifstream testListFile(test_list);
+  string fileName;
+  int target;
+  std::cout << "classify" << std::endl;
+  int n = 0;
+  while (testListFile >> fileName >> target) {
+    cv::Mat img = cv::imread(fileName);
+
+    std::vector<Prediction> predictions = classifier.Classify(img);
+ 
+    int output = predictions[1].second > predictions[0].second;
+    if (target == 1) {
+      if (output == 1) TP++;
+      else FN++;
+    }
+    else {
+      if (output == 1) FP++;
+      else TN++;
+    }
+    if ((n + 1) % 100 == 0) {
+      std::cout << n << std::endl;
+    }
+  }
+  std::cout << "TP " << TP << std::endl;
+  std::cout << "FN " << FN << std::endl;
+  std::cout << "FP " << FP << std::endl;
+  std::cout << "TN " << TN << std::endl;
+
+  double sens, spec, voe, accuracy;
+
+  sens = TP / (TP + FN);
+  spec = TN / (TN + FP);
+  voe = (1 - TP / (FP + TP + FN));
+  accuracy = (TP + TN) / (FP + TP + FN + TN);
+
+  std::cout << "sens " << sens << std::endl;
+  std::cout << "spec " << spec << std::endl;
+  std::cout << "voe " << voe << std::endl;
+  std::cout << "accuracy " << accuracy << std::endl;
+
+}
+#define TEST
+
 int main(int argc, char** argv)
 {
+#ifdef TEST
+  testOn2DTile(argc, argv);
+  return EXIT_SUCCESS;
+#endif // TEST
+
     std::cout << "Usage-:\n\
     string logger_file = argv[0];\n\
     string model_file = argv[1];\n\
