@@ -340,8 +340,8 @@ void testOn2DTile(int argc, char** argv)
       if (output == 1) FP++;
       else TN++;
     }
-    if ((n + 1) % 100 == 0) {
-      std::cout << n << std::endl;
+    if ((n++) % 100 == 0) {
+      std::cout << n-1 << std::endl;
     }
   }
   std::cout << "TP " << TP << std::endl;
