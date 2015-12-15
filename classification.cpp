@@ -1,281 +1,633 @@
-#include <caffe/caffe.hpp>
-#ifdef USE_OPENCV
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#endif  // USE_OPENCV
-#include <algorithm>
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <utility>
+
+#include <cuda_runtime.h>
+
+#include <cstring>
+#include <cstdlib>
 #include <vector>
+#include <string>
+#include <iostream>
+#include <omp.h>
 
-#ifdef USE_OPENCV
-#include <logging.h>
-#include "../../src/caffe/proto/caffe.pb.h"
-using namespace caffe;  // NOLINT(build/namespaces)
-using std::string;
+// ITK
+#include <itkImage.h>
+#include <itkImageFileReader.h>
+#include <itkImageFileWriter.h>
+#include <itkTestingExtractSliceImageFilter.h>
+#include <itkMetaImageIOFactory.h>
 
-/* Pair (label, confidence) representing a prediction. */
-typedef std::pair<string, float> Prediction;
+#include "C:/alex/agtk/Modules/Core/agtkResampling.h" //todo remove it or intergrate agtk
 
-class Classifier {
- public:
-  Classifier(const string& model_file,
-             const string& trained_file,
-             const string& mean_file,
-             const string& label_file);
+#include "caffe/caffe.hpp"
+#include "caffe/blob.hpp"
 
-  std::vector<Prediction> Classify(const cv::Mat& img, int N = 5);
+using namespace caffe;
+using namespace std;
 
- private:
-  void SetMean(const string& mean_file);
+template <typename TPixel>
+agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const typename itk::Image<TPixel, 3>::IndexType& index, int halfSize)
+{
+  typedef itk::Image<TPixel, 3> ImageType3D;
 
-  std::vector<float> Predict(const cv::Mat& img);
+  typedef itk::Testing::ExtractSliceImageFilter<ImageType3D, agtk::UInt8Image2D> ExtractVolumeFilterType;
 
-  void WrapInputLayer(std::vector<cv::Mat>* input_channels);
+  auto extractVolumeFilter = ExtractVolumeFilterType::New();
+  agtk::Image3DSize size = { 2 * halfSize, 2 * halfSize, 0 };
+  agtk::Image3DIndex start = { index[0] - halfSize + 1, index[1] - halfSize + 1, index[2] };
 
-  void Preprocess(const cv::Mat& img,
-                  std::vector<cv::Mat>* input_channels);
+  // check boundary
+  agtk::Image3DSize allSize = image->GetLargestPossibleRegion().GetSize();
+  agtk::Image3DIndex corner = start + size;
 
- private:
-  shared_ptr<Net<float> > net_;
-  cv::Size input_geometry_;
-  int num_channels_;
-  cv::Mat mean_;
-  std::vector<string> labels_;
-};
+  typename ImageType3D::RegionType outputRegion;
+  outputRegion.SetSize(size);
+  outputRegion.SetIndex(start);
 
-Classifier::Classifier(const string& model_file,
-                       const string& trained_file,
-                       const string& mean_file,
-                       const string& label_file) {
-  std::cout << "0\n";
+  extractVolumeFilter->SetInput(image);
+  extractVolumeFilter->SetExtractionRegion(outputRegion);
+  extractVolumeFilter->SetDirectionCollapseToGuess();
+  extractVolumeFilter->Update();
 
-#ifdef CPU_ONLY
-  Caffe::set_mode(Caffe::CPU);
-#else
-  Caffe::set_mode(Caffe::GPU);
-#endif
-  std::cout << "1\n";
-
-  /* Load the network. */
-  net_.reset(new Net<float>(model_file, TEST));
-  std::cout << "2\n";
-
-  net_->CopyTrainedLayersFrom(trained_file);
-  CHECK_EQ(net_->num_inputs(), 1) << "Network should have exactly one input.";
-  CHECK_EQ(net_->num_outputs(), 1) << "Network should have exactly one output.";
-
-  Blob<float>* input_layer = net_->input_blobs()[0];
-  num_channels_ = input_layer->channels();
-  CHECK(num_channels_ == 3 || num_channels_ == 1)
-    << "Input layer should have 1 or 3 channels.";
-  input_geometry_ = cv::Size(input_layer->width(), input_layer->height());
-
-  /* Load the binaryproto mean file. */
-  SetMean(mean_file);
-
-  /* Load labels. */
-  std::ifstream labels(label_file.c_str());
-  CHECK(labels) << "Unable to open labels file " << label_file;
-  string line;
-  while (std::getline(labels, line))
-    labels_.push_back(string(line));
-
-  Blob<float>* output_layer = net_->output_blobs()[0];
-  CHECK_EQ(labels_.size(), output_layer->channels())
-    << "Number of labels is different from the output layer dimension.";
+  return extractVolumeFilter->GetOutput();
 }
 
-static bool PairCompare(const std::pair<float, int>& lhs,
-                        const std::pair<float, int>& rhs) {
-  return lhs.first > rhs.first;
-}
+agtk::Image3DRegion getBinaryMaskBoundingBoxRegion(const agtk::BinaryImage3D* image)
+{
+  // TODO: This code can be parallelized
+  agtk::Image3DIndex minIndex, maxIndex;
 
-/* Return the indices of the top N values of vector v. */
-static std::vector<int> Argmax(const std::vector<float>& v, int N) {
-  std::vector<std::pair<float, int> > pairs;
-  for (size_t i = 0; i < v.size(); ++i)
-    pairs.push_back(std::make_pair(v[i], i));
-  std::partial_sort(pairs.begin(), pairs.begin() + N, pairs.end(), PairCompare);
+  minIndex.Fill(itk::NumericTraits<agtk::Image3DIndex::IndexValueType>::max());
+  maxIndex.Fill(itk::NumericTraits<agtk::Image3DIndex::IndexValueType>::NonpositiveMin());
 
-  std::vector<int> result;
-  for (int i = 0; i < N; ++i)
-    result.push_back(pairs[i].second);
-  return result;
-}
+  itk::ImageRegionConstIteratorWithIndex<agtk::BinaryImage3D> it(image, image->GetLargestPossibleRegion());
 
-/* Return the top N predictions. */
-std::vector<Prediction> Classifier::Classify(const cv::Mat& img, int N) {
-  std::vector<float> output = Predict(img);
+  it.GoToBegin();
 
-  N = std::min<int>(labels_.size(), N);
-  std::vector<int> maxN = Argmax(output, N);
-  std::vector<Prediction> predictions;
-  for (int i = 0; i < N; ++i) {
-    int idx = maxN[i];
-    predictions.push_back(std::make_pair(labels_[idx], output[idx]));
+  while (!it.IsAtEnd()) {
+    if (it.Get() != agtk::OUTSIDE_BINARY_VALUE) {
+      agtk::Image3DIndex index = it.GetIndex();
+
+      if (index[0] < minIndex[0])
+        minIndex[0] = index[0];
+
+      if (index[1] < minIndex[1])
+        minIndex[1] = index[1];
+
+      if (index[2] < minIndex[2])
+        minIndex[2] = index[2];
+
+      if (index[0] > maxIndex[0])
+        maxIndex[0] = index[0];
+
+      if (index[1] > maxIndex[1])
+        maxIndex[1] = index[1];
+
+      if (index[2] > maxIndex[2])
+        maxIndex[2] = index[2];
+    }
+
+    ++it;
   }
 
-  return predictions;
+  agtk::Image3DRegion region;
+
+  region.SetIndex(minIndex);
+  region.SetUpperIndex(maxIndex);
+
+  return region;
 }
 
-/* Load the mean file in binaryproto format. */
-void Classifier::SetMean(const string& mean_file) {
-  BlobProto blob_proto;
-  ReadProtoFromBinaryFileOrDie(mean_file.c_str(), &blob_proto);
-
-  /* Convert from BlobProto to Blob<float> */
-  Blob<float> mean_blob;
-  mean_blob.FromProto(blob_proto);
-  CHECK_EQ(mean_blob.channels(), num_channels_)
-    << "Number of channels of mean file doesn't match input layer.";
-
-  /* The format of the mean file is planar 32-bit float BGR or grayscale. */
-  std::vector<cv::Mat> channels;
-  float* data = mean_blob.mutable_cpu_data();
-  for (int i = 0; i < num_channels_; ++i) {
-    /* Extract an individual channel. */
-    cv::Mat channel(mean_blob.height(), mean_blob.width(), CV_32FC1, data);
-    channels.push_back(channel);
-    data += mean_blob.height() * mean_blob.width();
-  }
-
-  /* Merge the separate channels into a single image. */
-  cv::Mat mean;
-  cv::merge(channels, mean);
-
-  /* Compute the global mean pixel value and create a mean image
-   * filled with this value. */
-  cv::Scalar channel_mean = cv::mean(mean);
-  mean_ = cv::Mat(input_geometry_, mean.type(), channel_mean);
-}
-
-std::vector<float> Classifier::Predict(const cv::Mat& img) {
-  Blob<float>* input_layer = net_->input_blobs()[0];
-  input_layer->Reshape(1, num_channels_,
-                       input_geometry_.height, input_geometry_.width);
-  /* Forward dimension change to all layers. */
-  net_->Reshape();
-
-  std::vector<cv::Mat> input_channels;
-  WrapInputLayer(&input_channels);
-
-  Preprocess(img, &input_channels);
-
-  net_->ForwardPrefilled();
-
-  /* Copy the output layer to a std::vector */
-  Blob<float>* output_layer = net_->output_blobs()[0];
-  const float* begin = output_layer->cpu_data();
-  const float* end = begin + output_layer->channels();
-  return std::vector<float>(begin, end);
-}
-
-/* Wrap the input layer of the network in separate cv::Mat objects
- * (one per channel). This way we save one memcpy operation and we
- * don't need to rely on cudaMemcpy2D. The last preprocessing
- * operation will write the separate channels directly to the input
- * layer. */
-void Classifier::WrapInputLayer(std::vector<cv::Mat>* input_channels) {
-  Blob<float>* input_layer = net_->input_blobs()[0];
-
-  int width = input_layer->width();
-  int height = input_layer->height();
-  float* input_data = input_layer->mutable_cpu_data();
-  for (int i = 0; i < input_layer->channels(); ++i) {
-    cv::Mat channel(height, width, CV_32FC1, input_data);
-    input_channels->push_back(channel);
-    input_data += width * height;
-  }
-}
-
-void Classifier::Preprocess(const cv::Mat& img,
-                            std::vector<cv::Mat>* input_channels) {
-  /* Convert the input image to the input image format of the network. */
-  cv::Mat sample;
-  if (img.channels() == 3 && num_channels_ == 1)
-    cv::cvtColor(img, sample, CV_BGR2GRAY);
-  else if (img.channels() == 4 && num_channels_ == 1)
-    cv::cvtColor(img, sample, CV_BGRA2GRAY);
-  else if (img.channels() == 4 && num_channels_ == 3)
-    cv::cvtColor(img, sample, CV_BGRA2BGR);
-  else if (img.channels() == 1 && num_channels_ == 3)
-    cv::cvtColor(img, sample, CV_GRAY2BGR);
-  else
-    sample = img;
-
-  cv::Mat sample_resized;
-  if (sample.size() != input_geometry_)
-    cv::resize(sample, sample_resized, input_geometry_);
-  else
-    sample_resized = sample;
-
-  cv::Mat sample_float;
-  if (num_channels_ == 3)
-    sample_resized.convertTo(sample_float, CV_32FC3);
-  else
-    sample_resized.convertTo(sample_float, CV_32FC1);
-
-  //av--
-  //cv::Mat sample_normalized;
-  //cv::subtract(sample_float, mean_, sample_normalized);
-
-  /* This operation will write the separate BGR planes directly to the
-   * input layer of the network because it is wrapped by the cv::Mat
-   * objects in input_channels. */
-  //av-- cv::split(sample_normalized, *input_channels);
-  cv::split(sample_float, *input_channels);
-
-  CHECK(reinterpret_cast<float*>(input_channels->at(0).data)
-        == net_->input_blobs()[0]->cpu_data())
-    << "Input channels are not wrapping the input layer of the network.";
-}
+//
+//void testOn2DTiles(int argc, char** argv)
+//{
+//  string model_file = argv[1];
+//  string trained_file = argv[2];
+//  string mean_file = argv[3];
+//  string label_file = argv[4];
+//  string test_list = argv[5];
+//
+//  std::cout <<
+//    "model_file = " << model_file << std::endl <<
+//    "trained_file =" << trained_file << std::endl <<
+//    "mean_file = " << mean_file << std::endl <<
+//    "label_file =" << label_file << std::endl <<
+//    "test_list =" << test_list << std::endl;
+//
+//  std::cout << "load classifier" << std::endl;
+//  ::google::InitGoogleLogging("log.txt");
+//  Classifier classifier(model_file, trained_file, mean_file, label_file);
+//
+//  std::cout << "." << std::endl;
+//
+//  int TP = 0, FN = 0, FP = 0, TN = 0;
+//
+//  std::ifstream testListFile(test_list);
+//  string fileName;
+//  int target;
+//  std::cout << "classify" << std::endl;
+//  int n = 0;
+//  while (testListFile >> fileName >> target) {
+//    cv::Mat img = cv::imread(fileName, -1);
+//    if (img.empty()){
+//      std::cout << "Unable to decode image " << fileName << std::endl;
+//    }
+//
+//    std::vector<Prediction> predictions = classifier.Classify(img);
+//
+//    int output = predictions[0].first == "1";
+//    if (target == 1) {
+//      if (output == 1) TP++;
+//      else FN++;
+//    }
+//    else {
+//      if (output == 1) FP++;
+//      else TN++;
+//    }
+//    
+//    std::cout << "1: " << predictions[1].second << ", 0: " << predictions[0].second << std::endl;
+//    if ((n++) % 100 == 0) {
+//      std::cout << n - 1 << std::endl;
+//    }
+//  }
+//  std::cout << "TP " << TP << std::endl;
+//  std::cout << "FN " << FN << std::endl;
+//  std::cout << "FP " << FP << std::endl;
+//  std::cout << "TN " << TN << std::endl;
+//
+//  double sens, spec, voe, accuracy;
+//
+//  sens = TP / (TP + FN);
+//  spec = TN / (TN + FP);
+//  voe = (1 - TP / (FP + TP + FN));
+//  accuracy = (TP + TN) / (FP + TP + FN + TN);
+//
+//  std::cout << "sens " << sens << std::endl;
+//  std::cout << "spec " << spec << std::endl;
+//  std::cout << "voe " << voe << std::endl;
+//  std::cout << "accuracy " << accuracy << std::endl;
+//
+//}
+//int oldmain(int argc, char** argv)
+//{
+//  std::cout << "class NEW\n";
+//  if (argc < 4 || argc > 6) {
+//    LOG(ERROR) << "deploy caffemodel img_file "
+//      << "[CPU/GPU] [Device ID]";
+//    return 1;
+//  }
+//  //Caffe::set_phase(Caffe::TEST);
+//
+//  //Setting CPU or GPU
+//  if (argc >= 5 && strcmp(argv[4], "GPU") == 0) {
+//    Caffe::set_mode(Caffe::GPU);
+//    int device_id = 0;
+//    if (argc == 6) {
+//      device_id = atoi(argv[5]);
+//    }
+//    Caffe::SetDevice(device_id);
+//    LOG(ERROR) << "Using GPU #" << device_id;
+//  }
+//  else {
+//    LOG(ERROR) << "Using CPU";
+//    Caffe::set_mode(Caffe::CPU);
+//  }
+//
+//  //get the net
+//  Net<float> caffe_test_net(argv[1], TEST);
+//  //get trained net
+//  caffe_test_net.CopyTrainedLayersFrom(argv[2]);
+//
+//  //get datum
+//  Datum datum;
+//  if (!ReadImageToDatum(argv[3], 1, 64, 64, &datum, false)) {
+//    LOG(ERROR) << "Error during file reading";
+//  }
+//  LOG(INFO) << "datum.channels() " << datum.channels();
+//  //get the blob
+//  Blob<float>* blob = new Blob<float>(1, datum.channels(), datum.height(), datum.width());
+//
+//  //get the blobproto
+//  BlobProto blob_proto;
+//  blob_proto.set_num(1);
+//  blob_proto.set_channels(datum.channels());
+//  blob_proto.set_height(datum.height());
+//  blob_proto.set_width(datum.width());
+//  const int data_size = datum.channels() * datum.height() * datum.width();
+//  int size_in_datum = std::max<int>(datum.data().size(),
+//    datum.float_data_size());
+//  for (int i = 0; i < size_in_datum; ++i) {
+//    blob_proto.add_data(0.);
+//  }
+//  const string& data = datum.data();
+//  if (data.size() != 0) {
+//    for (int i = 0; i < size_in_datum; ++i) {
+//      //original was uint8_t, so it also work well, 
+//      //but for the case of dicom data uint16_t is better :-)
+//      //blob_proto.set_data(i, blob_proto.data(i) + (uint16_t)data[i]);
+//      blob_proto.set_data(i, blob_proto.data(i) + (uint16_t)data[i]);
+//    }
+//  }
+//
+//  //set data into blob
+//  blob->FromProto(blob_proto);
+//
+//  //fill the vector
+//  vector<Blob<float>*> bottom;
+//  bottom.push_back(blob);
+//  float type = 0.0;
+//
+//  const vector<Blob<float>*>& result = caffe_test_net.Forward(bottom, &type);
+//
+//  //Here I can use the argmax layer, but for now I do a simple for :)
+//  float max = 0;
+//  float max_i = 0;
+//  for (int i = 0; i <= 1; ++i) {
+//    float value = result[0]->cpu_data()[i];
+//    if (max < value){
+//      max = value;
+//      max_i = i;
+//    }
+//  }
+//  LOG(ERROR) << "max: " << max << " i " << max_i;
+//
+//  return 0;
+//
+//}
+//void testOn2DTile(int argc, char** argv)
+//{
+//  if (argc != 6) {
+//    std::cerr << "Usage: " << argv[0]
+//      << " deploy.prototxt network.caffemodel"
+//      << " mean.binaryproto labels.txt img.jpg" << std::endl;
+//    return;
+//  }
+//  std::cout << "1\n";
+//
+//  ::google::InitGoogleLogging(argv[0]);
+//
+//  string model_file = argv[1];
+//  string trained_file = argv[2];
+//  string mean_file = argv[3];
+//  string label_file = argv[4];
+//  std::cout << "2\n";
+//
+//  Classifier classifier(model_file, trained_file, mean_file, label_file);
+//
+//  string file = argv[5];
+//
+//  std::cout << "---------- Prediction for "
+//    << file << " ----------" << std::endl;
+//
+//  cv::Mat img = cv::imread(file, -1);
+//  CHECK(!img.empty()) << "Unable to decode image " << file;
+//  std::time_t result = std::time(nullptr);
+//  std::cout << std::asctime(std::localtime(&result)) << "\n";
+//  std::vector<Prediction> predictions;
+//  predictions = classifier.Classify(img);
+//  result = std::time(nullptr);
+//  std::cout << std::asctime(std::localtime(&result)) << "\n";
+//
+//  int output = predictions[0].first == "1";
+//  std::cout << "output: " << output << std::endl;
+//
+//}
 
 int main(int argc, char** argv) {
-  if (argc != 6) {
-    std::cerr << "Usage: " << argv[0]
-              << " deploy.prototxt network.caffemodel"
-              << " mean.binaryproto labels.txt img.jpg" << std::endl;
-    return 1;
-  }
-  std::cout << "1\n";
 
-  ::google::InitGoogleLogging(argv[0]);
+  //to test on list of 2d sample uncomment these lines
+  //testOn2DTiles(argc,argv);
+  //return EXIT_SUCCESS;
 
-  string model_file   = argv[1];
+  std::cout << "Usage-:\n\
+                 string model_file = argv[1];\n\
+                   string trained_file = argv[2];\n\
+                     \n\
+                       string start_x_str = argv[3];\n\
+                         string start_y_str = argv[4];\n\
+                           string start_z_str = argv[5];\n\
+                             \n\
+                               string size_x_str = argv[6];\n\
+                                 string size_y_str = argv[7];\n\
+                                   string size_z_str = argv[8];\n\
+                                     \n\
+                                       string radiusXY_str = argv[9];\n\
+                                         string preset = argv[10];\n\
+                                           string spacingXY_str = argv[11]; \n\
+                                             \n\
+                                               string input_file = argv[12];\n\
+                                                 string mask_file = argv[13];\n\
+                                                   string output_file = argv[14];"
+                                                   << std::endl;
+
+  string model_file = argv[1];
   string trained_file = argv[2];
-  string mean_file    = argv[3];
-  string label_file   = argv[4];
-  std::cout << "2\n";
 
-  Classifier classifier(model_file, trained_file, mean_file, label_file);
+  string start_x_str = argv[3];
+  string start_y_str = argv[4];
+  string start_z_str = argv[5];
 
-  string file = argv[5];
+  string size_x_str = argv[6];
+  string size_y_str = argv[7];
+  string size_z_str = argv[8];
 
-  std::cout << "---------- Prediction for "
-            << file << " ----------" << std::endl;
+  string radiusXY_str = argv[9];
+  string preset = argv[10];
+  string spacingXY_str = argv[11];
 
-  cv::Mat img = cv::imread(file, -1);
-  CHECK(!img.empty()) << "Unable to decode image " << file;
-  std::time_t result = std::time(nullptr);
-  std::cout << std::asctime(std::localtime(&result)) << "\n";
-  std::vector<Prediction> predictions;
-  predictions = classifier.Classify(img);
-  result = std::time(nullptr);
-  std::cout << std::asctime(std::localtime(&result)) << "\n";
+  string input_file = argv[12];
+  string mask_file = argv[13];
+  string output_file = argv[14];
 
-  /* Print the top N predictions. */
-  for (size_t i = 0; i < predictions.size(); ++i) {
-    Prediction p = predictions[i];
-    std::cout << std::fixed << std::setprecision(4) << p.second << " - \""
-              << p.first << "\"" << std::endl;
+  agtk::Image3DIndex start;
+  start[0] = atoi(start_x_str.c_str());
+  start[1] = atoi(start_y_str.c_str());
+  start[2] = atoi(start_z_str.c_str());
+
+  agtk::Image3DSize size;
+  size[0] = atoi(size_x_str.c_str());
+  size[1] = atoi(size_y_str.c_str());
+  size[2] = atoi(size_z_str.c_str());
+
+  agtk::Image3DRegion region;
+  region.SetIndex(start);
+  region.SetSize(size);
+
+  int radiusXY = atoi(radiusXY_str.c_str());
+  int spacingXY = atoi(spacingXY_str.c_str());
+
+  std::cout << "model_file = " << model_file << std::endl <<
+    "trained_file =" << trained_file << std::endl <<
+    "region = " << region << std::endl <<
+    "radiusXY=" << radiusXY << std::endl <<
+    "preset=" << preset << std::endl <<
+    "spacingXY=" << spacingXY << std::endl <<
+    "input_file = " << input_file << std::endl <<
+    "mask_file =" << mask_file << std::endl <<
+    "output_file =" << output_file << std::endl;
+
+  std::cout << "load images" << std::endl;
+
+  itk::MetaImageIOFactory::RegisterOneFactory();
+
+  std::cout << "." << std::endl;
+
+  typedef itk::ImageFileReader<agtk::Int16Image3D> ReaderType;
+  typedef itk::ImageFileReader<agtk::BinaryImage3D> BinaryReaderType;
+
+  ReaderType::Pointer reader = ReaderType::New();
+  reader->SetFileName(input_file);
+  try {
+    reader->Update();
   }
+  catch (itk::ExceptionObject &excp) {
+    std::cout << "Exception thrown while reading the image " << std::endl;
+    std::cout << excp << std::endl;
+    return EXIT_FAILURE;
+  }
+  std::cout << "." << std::endl;
+
+  agtk::BinaryImage3D::Pointer imageMask;
+  if (mask_file == "BOUNDING_BOX") {
+    imageMask = nullptr;
+  }
+  else {
+    BinaryReaderType::Pointer readerMask = BinaryReaderType::New();
+    readerMask->SetFileName(mask_file);
+    try {
+      readerMask->Update();
+    }
+    catch (itk::ExceptionObject &excp) {
+      std::cout << "Exception thrown while reading the mask " << std::endl;
+      std::cout << excp << std::endl;
+      return EXIT_FAILURE;
+    }
+    imageMask = readerMask->GetOutput();
+  }
+  std::cout << "." << std::endl;
+
+  agtk::Int16Image3D::Pointer image16 = reader->GetOutput();
+
+  //preprocess image - shift image
+  agtk::FloatImage3D::Pointer image;
+
+  if (preset == "pancreas") {
+    const int shift = 190;// b
+    const int squeeze = 2;// a
+
+    // x' = (x + b)/a
+    itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+      it.Set((it.Get() + shift) / squeeze);
+    }
+  }
+  else if (preset == "livertumors") {
+    const int shift = 40;
+    itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+      it.Set(it.Get() + shift);
+    }
+  }
+
+  if (spacingXY != 0) { //resample image by axial slices
+    agtk::Image3DSpacing spacing;
+    spacing[0] = spacingXY;
+    spacing[1] = spacingXY;
+    spacing[2] = image->GetSpacing()[2];
+
+    image = agtk::resampling(image.GetPointer(), spacing);
+
+    if (imageMask != nullptr) {
+      imageMask = agtk::resamplingBinary(imageMask.GetPointer(), spacing);
+    }
+  }
+
+  typedef itk::CastImageFilter<agtk::Int16Image3D, agtk::FloatImage3D> Cast;
+  auto cast = Cast::New();
+  cast->SetInput(image16);
+  cast->Update();
+  image = cast->GetOutput();
+  if (imageMask != nullptr) {
+    if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
+      std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
+      return EXIT_FAILURE;
+    }
+  }
+  std::cout << "." << std::endl;
+
+  //
+  std::cout << "Calculating indices" << std::endl;
+
+  auto shrinkRegion = image->GetLargestPossibleRegion();
+  shrinkRegion.ShrinkByRadius(radiusXY);
+  region.Crop(shrinkRegion);
+
+  vector<agtk::Image3DIndex> indices;
+  std::cout << "region: " << region << std::endl;
+  if (imageMask.IsNotNull()) {
+    std::cout << "use mask" << std::endl;
+    itk::ImageRegionConstIterator<agtk::BinaryImage3D> itMask(imageMask, region);
+
+    for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
+      if (itMask.Get() != 0) {
+        //exp
+        auto& index = itMask.GetIndex();
+        if (index[0] % 3 == 1 && index[1] % 3 == 1) {
+          indices.push_back(itMask.GetIndex());
+        }
+      }
+    }
+  }
+  else {
+    std::cout << "not use mask" << std::endl;
+    itk::ImageRegionConstIterator<agtk::FloatImage3D> itMask(image, region);
+    for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
+      //exp
+      auto& index = itMask.GetIndex();
+      if (index[0] % 3 == 1 && index[1] % 3 == 1) {
+        indices.push_back(itMask.GetIndex());
+      }
+    }
+  }
+  const int totalCount = indices.size();
+
+  std::cout << "total count:" << totalCount << std::endl;
+
+  agtk::BinaryImage3D::Pointer outImage = agtk::BinaryImage3D::New();
+  outImage->CopyInformation(image);
+  outImage->SetRegions(image->GetLargestPossibleRegion());
+  outImage->Allocate();
+  outImage->FillBuffer(0);
+
+  std::cout << "." << std::endl;
+
+  int itCount = 0;
+  int tumCount = 0;
+
+  std::cout << "Applying CNN in deploy config" << std::endl;
+
+  //Setting CPU or GPU
+  Caffe::set_mode(Caffe::GPU);
+  const int device_id = 1;
+  Caffe::SetDevice(device_id);
+
+  //get the net
+  Net<float> caffe_test_net(model_file, TEST);
+  //get trained net
+  caffe_test_net.CopyTrainedLayersFrom(trained_file);
+
+  const int channels = 1;
+  const int height = 2 * radiusXY;
+  const int width = 2 * radiusXY;
+  const int data_size = height*width*channels;
+  const int batchLength = 1024;
+
+  //omp_set_nested(1);
+  //omp_set_num_threads(4);
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+
+  //#pragma omp parallel for
+  for (int i = 0; i < totalCount / batchLength; ++i) { //todo fix last total%batch_size indices
+    auto time0 = clock();
+    std::cout << i << "th batch" << std::endl;
+
+    Blob<float>* blob = new Blob<float>(batchLength, channels, height, width);
+
+    BlobProto blob_proto;
+    blob_proto.set_num(batchLength);
+    blob_proto.set_channels(blob->channels());
+    blob_proto.set_height(blob->height());
+    blob_proto.set_width(blob->width());
+    //float* data = new float[batchLength * data_size];
+
+    //#pragma omp parallel for
+    for (int batch_i = 0; batch_i < batchLength; ++batch_i) {
+      //auto time_0 = clock();
+      auto tile = getTile(image.GetPointer(), indices[i*batchLength + batch_i], radiusXY);
+      //auto time_1 = clock();
+
+      auto dataPointer = tile->GetBufferPointer();
+
+      for (int j = 0; j < data_size; ++j) {
+        blob_proto.add_data(dataPointer[j]);
+      }
+      //auto time_2 = clock();
+      //std::cout << "gettile: " << (double)(time_1 - time_0)*1000/CLOCKS_PER_SEC <<
+      //  ". add to proto: " << (double)(time_2 - time_1)*1000 / CLOCKS_PER_SEC << std::endl;
+
+      //std::cout << batch_i << std::endl;
+    }
+    blob->FromProto(blob_proto);
+    //blob->data().get()->set_cpu_data(data);
+    //fill the vector
+    vector<Blob<float>*> bottom;
+    bottom.push_back(blob);
+    float type = 0.0;
+
+    auto time1 = clock();
+
+    auto results = caffe_test_net.Forward(bottom, &type)[0]->cpu_data();
+    delete blob;
+    //delete[] data;
+    auto time2 = clock();
+    //Here I can use the argmax layer, but for now I do a simple for :)
+    for (int batch_i = 0; batch_i < batchLength; ++batch_i) {
+      auto& index = indices[i*batchLength + batch_i];
+
+      /* use it for multiclass problem
+      float max = 0;
+      float max_i = 0;
+      for (int j = 0; j < 2; ++j) {
+      float value = results->cpu_data()[batch_i + j];
+      if (max < value){
+      max = value;
+      max_i = j;
+      }
+      }
+      std::cout << "max: " << max << " i " << max_i << std::endl;
+      */
+      char val;
+      if (results[batch_i * 2 + 1] > results[batch_i * 2]) {
+        val = 1;
+        tumCount++;
+        //std::cout << "1" << std::endl;
+      }
+      else {
+        val = 0;
+        //std::cout << "0" << std::endl;
+      }
+      //outImage->SetPixel(index, val);
+      //exp
+      for (int k = -1; k < 2; ++k) {
+        for (int l = -1; l < 2; ++l) {
+          agtk::Image3DSize offset = { k, l, 0 };
+          auto index2 = index + offset;
+          outImage->SetPixel(index2, val);
+        }
+      }
+      //
+      if (++itCount % 1000 == 0) {
+        std::cout << itCount << " / " << totalCount << "\n";
+      }
+    }
+    auto time3 = clock();
+    std::cout << "load data: " << (double)(time1 - time0) / CLOCKS_PER_SEC << std::endl;
+    std::cout << "classify, delete data: " << (double)(time2 - time1) / CLOCKS_PER_SEC << std::endl;
+    std::cout << "set data into image: " << (double)(time3 - time2) / CLOCKS_PER_SEC << std::endl;
+
+  }
+
+  std::cout << "tumors - " << tumCount << "\n";
+
+  typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
+  writerType::Pointer writer = writerType::New();
+  writer->SetFileName(output_file);
+  writer->SetInput(outImage);
+  try {
+    writer->Update();
+  }
+  catch (itk::ExceptionObject &excp) {
+    std::cout << "Exception thrown while writing " << std::endl;
+    std::cout << excp << std::endl;
+    return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
 }
-#else
-int main(int argc, char** argv) {
-  LOG(FATAL) << "This example requires OpenCV; compile with USE_OPENCV.";
-}
-#endif  // USE_OPENCV
