@@ -14,6 +14,7 @@
 #include <itkImageFileWriter.h>
 #include <itkTestingExtractSliceImageFilter.h>
 #include <itkMetaImageIOFactory.h>
+#include <itkNrrdImageIOFactory.h>
 
 #include "C:/alex/agtk/Modules/Core/agtkResampling.h" //todo remove it or intergrate agtk
 
@@ -31,12 +32,8 @@ agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const ty
   typedef itk::Testing::ExtractSliceImageFilter<ImageType3D, agtk::UInt8Image2D> ExtractVolumeFilterType;
 
   auto extractVolumeFilter = ExtractVolumeFilterType::New();
-  agtk::Image3DSize size = { 2 * halfSize, 2 * halfSize, 0 };
-  agtk::Image3DIndex start = { index[0] - halfSize + 1, index[1] - halfSize + 1, index[2] };
-
-  // check boundary
-  agtk::Image3DSize allSize = image->GetLargestPossibleRegion().GetSize();
-  agtk::Image3DIndex corner = start + size;
+  agtk::Image3DSize size = {2 * halfSize, 2 * halfSize, 0};
+  agtk::Image3DIndex start = {index[0] - halfSize + 1, index[1] - halfSize + 1, index[2]};
 
   typename ImageType3D::RegionType outputRegion;
   outputRegion.SetSize(size);
@@ -96,227 +93,8 @@ agtk::Image3DRegion getBinaryMaskBoundingBoxRegion(const agtk::BinaryImage3D* im
   return region;
 }
 
-//
-//void testOn2DTiles(int argc, char** argv)
-//{
-//  string model_file = argv[1];
-//  string trained_file = argv[2];
-//  string mean_file = argv[3];
-//  string label_file = argv[4];
-//  string test_list = argv[5];
-//
-//  std::cout <<
-//    "model_file = " << model_file << std::endl <<
-//    "trained_file =" << trained_file << std::endl <<
-//    "mean_file = " << mean_file << std::endl <<
-//    "label_file =" << label_file << std::endl <<
-//    "test_list =" << test_list << std::endl;
-//
-//  std::cout << "load classifier" << std::endl;
-//  ::google::InitGoogleLogging("log.txt");
-//  Classifier classifier(model_file, trained_file, mean_file, label_file);
-//
-//  std::cout << "." << std::endl;
-//
-//  int TP = 0, FN = 0, FP = 0, TN = 0;
-//
-//  std::ifstream testListFile(test_list);
-//  string fileName;
-//  int target;
-//  std::cout << "classify" << std::endl;
-//  int n = 0;
-//  while (testListFile >> fileName >> target) {
-//    cv::Mat img = cv::imread(fileName, -1);
-//    if (img.empty()){
-//      std::cout << "Unable to decode image " << fileName << std::endl;
-//    }
-//
-//    std::vector<Prediction> predictions = classifier.Classify(img);
-//
-//    int output = predictions[0].first == "1";
-//    if (target == 1) {
-//      if (output == 1) TP++;
-//      else FN++;
-//    }
-//    else {
-//      if (output == 1) FP++;
-//      else TN++;
-//    }
-//    
-//    std::cout << "1: " << predictions[1].second << ", 0: " << predictions[0].second << std::endl;
-//    if ((n++) % 100 == 0) {
-//      std::cout << n - 1 << std::endl;
-//    }
-//  }
-//  std::cout << "TP " << TP << std::endl;
-//  std::cout << "FN " << FN << std::endl;
-//  std::cout << "FP " << FP << std::endl;
-//  std::cout << "TN " << TN << std::endl;
-//
-//  double sens, spec, voe, accuracy;
-//
-//  sens = TP / (TP + FN);
-//  spec = TN / (TN + FP);
-//  voe = (1 - TP / (FP + TP + FN));
-//  accuracy = (TP + TN) / (FP + TP + FN + TN);
-//
-//  std::cout << "sens " << sens << std::endl;
-//  std::cout << "spec " << spec << std::endl;
-//  std::cout << "voe " << voe << std::endl;
-//  std::cout << "accuracy " << accuracy << std::endl;
-//
-//}
-//int oldmain(int argc, char** argv)
-//{
-//  std::cout << "class NEW\n";
-//  if (argc < 4 || argc > 6) {
-//    LOG(ERROR) << "deploy caffemodel img_file "
-//      << "[CPU/GPU] [Device ID]";
-//    return 1;
-//  }
-//  //Caffe::set_phase(Caffe::TEST);
-//
-//  //Setting CPU or GPU
-//  if (argc >= 5 && strcmp(argv[4], "GPU") == 0) {
-//    Caffe::set_mode(Caffe::GPU);
-//    int device_id = 0;
-//    if (argc == 6) {
-//      device_id = atoi(argv[5]);
-//    }
-//    Caffe::SetDevice(device_id);
-//    LOG(ERROR) << "Using GPU #" << device_id;
-//  }
-//  else {
-//    LOG(ERROR) << "Using CPU";
-//    Caffe::set_mode(Caffe::CPU);
-//  }
-//
-//  //get the net
-//  Net<float> caffe_test_net(argv[1], TEST);
-//  //get trained net
-//  caffe_test_net.CopyTrainedLayersFrom(argv[2]);
-//
-//  //get datum
-//  Datum datum;
-//  if (!ReadImageToDatum(argv[3], 1, 64, 64, &datum, false)) {
-//    LOG(ERROR) << "Error during file reading";
-//  }
-//  LOG(INFO) << "datum.channels() " << datum.channels();
-//  //get the blob
-//  Blob<float>* blob = new Blob<float>(1, datum.channels(), datum.height(), datum.width());
-//
-//  //get the blobproto
-//  BlobProto blob_proto;
-//  blob_proto.set_num(1);
-//  blob_proto.set_channels(datum.channels());
-//  blob_proto.set_height(datum.height());
-//  blob_proto.set_width(datum.width());
-//  const int data_size = datum.channels() * datum.height() * datum.width();
-//  int size_in_datum = std::max<int>(datum.data().size(),
-//    datum.float_data_size());
-//  for (int i = 0; i < size_in_datum; ++i) {
-//    blob_proto.add_data(0.);
-//  }
-//  const string& data = datum.data();
-//  if (data.size() != 0) {
-//    for (int i = 0; i < size_in_datum; ++i) {
-//      //original was uint8_t, so it also work well, 
-//      //but for the case of dicom data uint16_t is better :-)
-//      //blob_proto.set_data(i, blob_proto.data(i) + (uint16_t)data[i]);
-//      blob_proto.set_data(i, blob_proto.data(i) + (uint16_t)data[i]);
-//    }
-//  }
-//
-//  //set data into blob
-//  blob->FromProto(blob_proto);
-//
-//  //fill the vector
-//  vector<Blob<float>*> bottom;
-//  bottom.push_back(blob);
-//  float type = 0.0;
-//
-//  const vector<Blob<float>*>& result = caffe_test_net.Forward(bottom, &type);
-//
-//  //Here I can use the argmax layer, but for now I do a simple for :)
-//  float max = 0;
-//  float max_i = 0;
-//  for (int i = 0; i <= 1; ++i) {
-//    float value = result[0]->cpu_data()[i];
-//    if (max < value){
-//      max = value;
-//      max_i = i;
-//    }
-//  }
-//  LOG(ERROR) << "max: " << max << " i " << max_i;
-//
-//  return 0;
-//
-//}
-//void testOn2DTile(int argc, char** argv)
-//{
-//  if (argc != 6) {
-//    std::cerr << "Usage: " << argv[0]
-//      << " deploy.prototxt network.caffemodel"
-//      << " mean.binaryproto labels.txt img.jpg" << std::endl;
-//    return;
-//  }
-//  std::cout << "1\n";
-//
-//  ::google::InitGoogleLogging(argv[0]);
-//
-//  string model_file = argv[1];
-//  string trained_file = argv[2];
-//  string mean_file = argv[3];
-//  string label_file = argv[4];
-//  std::cout << "2\n";
-//
-//  Classifier classifier(model_file, trained_file, mean_file, label_file);
-//
-//  string file = argv[5];
-//
-//  std::cout << "---------- Prediction for "
-//    << file << " ----------" << std::endl;
-//
-//  cv::Mat img = cv::imread(file, -1);
-//  CHECK(!img.empty()) << "Unable to decode image " << file;
-//  std::time_t result = std::time(nullptr);
-//  std::cout << std::asctime(std::localtime(&result)) << "\n";
-//  std::vector<Prediction> predictions;
-//  predictions = classifier.Classify(img);
-//  result = std::time(nullptr);
-//  std::cout << std::asctime(std::localtime(&result)) << "\n";
-//
-//  int output = predictions[0].first == "1";
-//  std::cout << "output: " << output << std::endl;
-//
-//}
-
-int main(int argc, char** argv) {
-
-  //to test on list of 2d sample uncomment these lines
-  //testOn2DTiles(argc,argv);
-  //return EXIT_SUCCESS;
-
-  std::cout << "Usage-:\n\
-                 string model_file = argv[1];\n\
-                   string trained_file = argv[2];\n\
-                     \n\
-                       string start_x_str = argv[3];\n\
-                         string start_y_str = argv[4];\n\
-                           string start_z_str = argv[5];\n\
-                             \n\
-                               string size_x_str = argv[6];\n\
-                                 string size_y_str = argv[7];\n\
-                                   string size_z_str = argv[8];\n\
-                                     \n\
-                                       string radiusXY_str = argv[9];\n\
-                                         string preset = argv[10];\n\
-                                           string spacingXY_str = argv[11]; \n\
-                                             \n\
-                                               string input_file = argv[12];\n\
-                                                 string mask_file = argv[13];\n\
-                                                   string output_file = argv[14];"
-                                                   << std::endl;
+int main(int argc, char** argv)
+{
 
   string model_file = argv[1];
   string trained_file = argv[2];
@@ -333,9 +111,14 @@ int main(int argc, char** argv) {
   string preset = argv[10];
   string spacingXY_str = argv[11];
 
-  string input_file = argv[12];
-  string mask_file = argv[13];
-  string output_file = argv[14];
+  string batchLengthStr = argv[12];
+
+  string groupXStr = argv[13]; // interpret an area XxY as 1 unit
+  string groupYStr = argv[14];
+
+  string input_file = argv[15];
+  string mask_file = argv[16];
+  string output_file = argv[17];
 
   agtk::Image3DIndex start;
   start[0] = atoi(start_x_str.c_str());
@@ -352,7 +135,10 @@ int main(int argc, char** argv) {
   region.SetSize(size);
 
   int radiusXY = atoi(radiusXY_str.c_str());
-  int spacingXY = atoi(spacingXY_str.c_str());
+  float spacingXY = atof(spacingXY_str.c_str());
+  int batchLength = atoi(batchLengthStr.c_str());
+  int groupX = atoi(groupXStr.c_str());
+  int groupY = atoi(groupYStr.c_str());
 
   std::cout << "model_file = " << model_file << std::endl <<
     "trained_file =" << trained_file << std::endl <<
@@ -360,6 +146,9 @@ int main(int argc, char** argv) {
     "radiusXY=" << radiusXY << std::endl <<
     "preset=" << preset << std::endl <<
     "spacingXY=" << spacingXY << std::endl <<
+    "batchSize=" << batchLength << std::endl <<
+    "groupX=" << groupX << std::endl <<
+    "groupY=" << groupY << std::endl <<
     "input_file = " << input_file << std::endl <<
     "mask_file =" << mask_file << std::endl <<
     "output_file =" << output_file << std::endl;
@@ -367,8 +156,12 @@ int main(int argc, char** argv) {
   std::cout << "load images" << std::endl;
 
   itk::MetaImageIOFactory::RegisterOneFactory();
+  itk::NrrdImageIOFactory::RegisterOneFactory();
+  std::cout << "nrrd factory registered" << std::endl;
 
-  std::cout << "." << std::endl;
+  typedef std::list<itk::LightObject::Pointer> RegisteredObjectsContainerType;
+  RegisteredObjectsContainerType registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
+  std::cout << "there are " << registeredIOs.size() << " IO objects available to the ImageFileReader." << std::endl;
 
   typedef itk::ImageFileReader<agtk::Int16Image3D> ReaderType;
   typedef itk::ImageFileReader<agtk::BinaryImage3D> BinaryReaderType;
@@ -406,8 +199,8 @@ int main(int argc, char** argv) {
 
   agtk::Int16Image3D::Pointer image16 = reader->GetOutput();
 
-  //preprocess image - shift image
-  agtk::FloatImage3D::Pointer image;
+  std::cout << "preprocess images" << std::endl;
+  std::cout << "shift, scale images" << std::endl;
 
   if (preset == "pancreas") {
     const int shift = 190;// b
@@ -421,39 +214,43 @@ int main(int argc, char** argv) {
   }
   else if (preset == "livertumors") {
     const int shift = 40;
+
+    // x'= x + shift
     itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
     for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
       it.Set(it.Get() + shift);
     }
   }
 
-  if (spacingXY != 0) { //resample image by axial slices
+  if (spacingXY != 0) {
+    std::cout << "resample image's axial slices" << std::endl;
+
     agtk::Image3DSpacing spacing;
     spacing[0] = spacingXY;
     spacing[1] = spacingXY;
-    spacing[2] = image->GetSpacing()[2];
+    spacing[2] = image16->GetSpacing()[2];
 
-    image = agtk::resampling(image.GetPointer(), spacing);
+    image16 = agtk::resampling(image16.GetPointer(), spacing);
 
     if (imageMask != nullptr) {
       imageMask = agtk::resamplingBinary(imageMask.GetPointer(), spacing);
     }
   }
 
+  std::cout << "cast image to float" << std::endl;
   typedef itk::CastImageFilter<agtk::Int16Image3D, agtk::FloatImage3D> Cast;
   auto cast = Cast::New();
   cast->SetInput(image16);
   cast->Update();
-  image = cast->GetOutput();
+  agtk::FloatImage3D::Pointer image = cast->GetOutput();
   if (imageMask != nullptr) {
     if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
       std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
       return EXIT_FAILURE;
     }
   }
-  std::cout << "." << std::endl;
+  image16 = nullptr;
 
-  //
   std::cout << "Calculating indices" << std::endl;
 
   auto shrinkRegion = image->GetLargestPossibleRegion();
@@ -468,9 +265,9 @@ int main(int argc, char** argv) {
 
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
       if (itMask.Get() != 0) {
-        //exp
-        auto& index = itMask.GetIndex();
-        if (index[0] % 3 == 1 && index[1] % 3 == 1) {
+        //take central pixel of group
+        const auto& index = itMask.GetIndex();
+        if (index[0] % groupX == groupX / 2 && index[1] % groupY == groupY / 2) {
           indices.push_back(itMask.GetIndex());
         }
       }
@@ -480,9 +277,9 @@ int main(int argc, char** argv) {
     std::cout << "not use mask" << std::endl;
     itk::ImageRegionConstIterator<agtk::FloatImage3D> itMask(image, region);
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
-      //exp
+      //take central pixel of group
       auto& index = itMask.GetIndex();
-      if (index[0] % 3 == 1 && index[1] % 3 == 1) {
+      if (index[0] % groupX == groupX / 2 && index[1] % groupY == groupY / 2) {
         indices.push_back(itMask.GetIndex());
       }
     }
@@ -506,7 +303,7 @@ int main(int argc, char** argv) {
 
   //Setting CPU or GPU
   Caffe::set_mode(Caffe::GPU);
-  const int device_id = 1;
+  const int device_id = 0;
   Caffe::SetDevice(device_id);
 
   //get the net
@@ -514,49 +311,46 @@ int main(int argc, char** argv) {
   //get trained net
   caffe_test_net.CopyTrainedLayersFrom(trained_file);
 
+  float* buffer = image->GetBufferPointer();
+
   const int channels = 1;
+  // tile's properties
   const int height = 2 * radiusXY;
   const int width = 2 * radiusXY;
-  const int data_size = height*width*channels;
-  const int batchLength = 1024;
+  const int tileSize = width*height;
+  const int lineSizeInBytes = 2 * radiusXY*sizeof(float);
 
-  //omp_set_nested(1);
-  //omp_set_num_threads(4);
+  // image's properties
+  const auto& imageSize = image->GetLargestPossibleRegion().GetSize();
+  const int sliceSize = imageSize[0] * imageSize[1];
+  const int lineSize = imageSize[1];
+
+  Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
+
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 
-  //#pragma omp parallel for
   for (int i = 0; i < totalCount / batchLength; ++i) { //todo fix last total%batch_size indices
     auto time0 = clock();
     std::cout << i << "th batch" << std::endl;
 
-    Blob<float>* blob = new Blob<float>(batchLength, channels, height, width);
 
-    BlobProto blob_proto;
-    blob_proto.set_num(batchLength);
-    blob_proto.set_channels(blob->channels());
-    blob_proto.set_height(blob->height());
-    blob_proto.set_width(blob->width());
-    //float* data = new float[batchLength * data_size];
+    for (int iTile = 0; iTile < batchLength; ++iTile) {
+      const auto& index = indices[i*batchLength + iTile];
 
-    //#pragma omp parallel for
-    for (int batch_i = 0; batch_i < batchLength; ++batch_i) {
-      //auto time_0 = clock();
-      auto tile = getTile(image.GetPointer(), indices[i*batchLength + batch_i], radiusXY);
-      //auto time_1 = clock();
+      for (int iRow = 0; iRow < 2 * radiusXY; iRow++) {
+        const int zOffset = index[2] * sliceSize;
+        const int yOffset = (index[1] - radiusXY + 1 + iRow)* lineSize;
+        const int xOffset = (index[0] - radiusXY + 1);
+        float* src = buffer + zOffset + yOffset + xOffset;
 
-      auto dataPointer = tile->GetBufferPointer();
+        const int tileOffset = iTile*tileSize;
+        const int rowOffset = iRow*width;
+        float* dst = const_cast<float*>(blob->cpu_data()) + tileOffset + rowOffset;
 
-      for (int j = 0; j < data_size; ++j) {
-        blob_proto.add_data(dataPointer[j]);
+        memcpy(dst, src, lineSizeInBytes);
       }
-      //auto time_2 = clock();
-      //std::cout << "gettile: " << (double)(time_1 - time_0)*1000/CLOCKS_PER_SEC <<
-      //  ". add to proto: " << (double)(time_2 - time_1)*1000 / CLOCKS_PER_SEC << std::endl;
-
-      //std::cout << batch_i << std::endl;
     }
-    blob->FromProto(blob_proto);
-    //blob->data().get()->set_cpu_data(data);
+
     //fill the vector
     vector<Blob<float>*> bottom;
     bottom.push_back(blob);
@@ -565,18 +359,17 @@ int main(int argc, char** argv) {
     auto time1 = clock();
 
     auto results = caffe_test_net.Forward(bottom, &type)[0]->cpu_data();
-    delete blob;
-    //delete[] data;
+
     auto time2 = clock();
     //Here I can use the argmax layer, but for now I do a simple for :)
-    for (int batch_i = 0; batch_i < batchLength; ++batch_i) {
-      auto& index = indices[i*batchLength + batch_i];
+    for (int iTile = 0; iTile < batchLength; ++iTile) {
+      auto& index = indices[i*batchLength + iTile];
 
       /* use it for multiclass problem
       float max = 0;
       float max_i = 0;
       for (int j = 0; j < 2; ++j) {
-      float value = results->cpu_data()[batch_i + j];
+      float value = results->cpu_data()[iTile + j];
       if (max < value){
       max = value;
       max_i = j;
@@ -585,35 +378,35 @@ int main(int argc, char** argv) {
       std::cout << "max: " << max << " i " << max_i << std::endl;
       */
       char val;
-      if (results[batch_i * 2 + 1] > results[batch_i * 2]) {
+      if (results[iTile * 2 + 1] > results[iTile * 2]) {
         val = 1;
         tumCount++;
-        //std::cout << "1" << std::endl;
       }
       else {
         val = 0;
-        //std::cout << "0" << std::endl;
       }
-      //outImage->SetPixel(index, val);
-      //exp
-      for (int k = -1; k < 2; ++k) {
-        for (int l = -1; l < 2; ++l) {
-          agtk::Image3DSize offset = { k, l, 0 };
+
+      //set group's area
+      for (int k = -groupX / 2; k < groupX - groupX / 2; ++k) {
+        for (int l = -groupY / 2; l < groupY - groupY / 2; ++l) {
+          agtk::Image3DSize offset = {k, l, 0};
           auto index2 = index + offset;
-          outImage->SetPixel(index2, val);
+          outImage->SetPixel(index2, val); // can be improved if only group 1x1 uses
         }
       }
+
       //
       if (++itCount % 1000 == 0) {
         std::cout << itCount << " / " << totalCount << "\n";
       }
     }
     auto time3 = clock();
-    std::cout << "load data: " << (double)(time1 - time0) / CLOCKS_PER_SEC << std::endl;
-    std::cout << "classify, delete data: " << (double)(time2 - time1) / CLOCKS_PER_SEC << std::endl;
-    std::cout << "set data into image: " << (double)(time3 - time2) / CLOCKS_PER_SEC << std::endl;
+    std::cout << "load data: " << static_cast<double>(time1 - time0) / CLOCKS_PER_SEC << std::endl;
+    std::cout << "classify: " << static_cast<double>(time2 - time1) / CLOCKS_PER_SEC << std::endl;
+    std::cout << "set data into image: " << static_cast<double>(time3 - time2) / CLOCKS_PER_SEC << std::endl;
 
   }
+  delete blob;
 
   std::cout << "tumors - " << tumCount << "\n";
 
