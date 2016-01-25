@@ -6,13 +6,11 @@
 #include <vector>
 #include <string>
 #include <iostream>
-#include <omp.h>
 
 // ITK
 #include <itkImage.h>
 #include <itkImageFileReader.h>
 #include <itkImageFileWriter.h>
-#include <itkTestingExtractSliceImageFilter.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 
@@ -21,80 +19,9 @@
 #include "caffe/caffe.hpp"
 #include "caffe/blob.hpp"
 
-using namespace caffe;
-using namespace std;
-
-template <typename TPixel>
-agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const typename itk::Image<TPixel, 3>::IndexType& index, int halfSize)
-{
-  typedef itk::Image<TPixel, 3> ImageType3D;
-
-  typedef itk::Testing::ExtractSliceImageFilter<ImageType3D, agtk::UInt8Image2D> ExtractVolumeFilterType;
-
-  auto extractVolumeFilter = ExtractVolumeFilterType::New();
-  agtk::Image3DSize size = {2 * halfSize, 2 * halfSize, 0};
-  agtk::Image3DIndex start = {index[0] - halfSize + 1, index[1] - halfSize + 1, index[2]};
-
-  typename ImageType3D::RegionType outputRegion;
-  outputRegion.SetSize(size);
-  outputRegion.SetIndex(start);
-
-  extractVolumeFilter->SetInput(image);
-  extractVolumeFilter->SetExtractionRegion(outputRegion);
-  extractVolumeFilter->SetDirectionCollapseToGuess();
-  extractVolumeFilter->Update();
-
-  return extractVolumeFilter->GetOutput();
-}
-
-agtk::Image3DRegion getBinaryMaskBoundingBoxRegion(const agtk::BinaryImage3D* image)
-{
-  // TODO: This code can be parallelized
-  agtk::Image3DIndex minIndex, maxIndex;
-
-  minIndex.Fill(itk::NumericTraits<agtk::Image3DIndex::IndexValueType>::max());
-  maxIndex.Fill(itk::NumericTraits<agtk::Image3DIndex::IndexValueType>::NonpositiveMin());
-
-  itk::ImageRegionConstIteratorWithIndex<agtk::BinaryImage3D> it(image, image->GetLargestPossibleRegion());
-
-  it.GoToBegin();
-
-  while (!it.IsAtEnd()) {
-    if (it.Get() != agtk::OUTSIDE_BINARY_VALUE) {
-      agtk::Image3DIndex index = it.GetIndex();
-
-      if (index[0] < minIndex[0])
-        minIndex[0] = index[0];
-
-      if (index[1] < minIndex[1])
-        minIndex[1] = index[1];
-
-      if (index[2] < minIndex[2])
-        minIndex[2] = index[2];
-
-      if (index[0] > maxIndex[0])
-        maxIndex[0] = index[0];
-
-      if (index[1] > maxIndex[1])
-        maxIndex[1] = index[1];
-
-      if (index[2] > maxIndex[2])
-        maxIndex[2] = index[2];
-    }
-
-    ++it;
-  }
-
-  agtk::Image3DRegion region;
-
-  region.SetIndex(minIndex);
-  region.SetUpperIndex(maxIndex);
-
-  return region;
-}
-
 int main(int argc, char** argv)
 {
+  using namespace caffe;
 
   string model_file = argv[1];
   string trained_file = argv[2];
@@ -116,9 +43,11 @@ int main(int argc, char** argv)
   string groupXStr = argv[13]; // interpret an area XxY as 1 unit
   string groupYStr = argv[14];
 
-  string input_file = argv[15];
-  string mask_file = argv[16];
-  string output_file = argv[17];
+  string classCountStr = argv[15];
+
+  string input_file = argv[16];
+  string mask_file = argv[17];
+  string output_file = argv[18];
 
   agtk::Image3DIndex start;
   start[0] = atoi(start_x_str.c_str());
@@ -139,6 +68,7 @@ int main(int argc, char** argv)
   int batchLength = atoi(batchLengthStr.c_str());
   int groupX = atoi(groupXStr.c_str());
   int groupY = atoi(groupYStr.c_str());
+  int classCount = atoi(classCountStr.c_str());
 
   std::cout << "model_file = " << model_file << std::endl <<
     "trained_file =" << trained_file << std::endl <<
@@ -149,9 +79,14 @@ int main(int argc, char** argv)
     "batchSize=" << batchLength << std::endl <<
     "groupX=" << groupX << std::endl <<
     "groupY=" << groupY << std::endl <<
+    "classCount=" << classCount << std::endl <<
     "input_file = " << input_file << std::endl <<
     "mask_file =" << mask_file << std::endl <<
     "output_file =" << output_file << std::endl;
+
+  if (classCount != 2 && classCount != 4) {
+    std::cout << "classCount must be 2 or 4";
+  }
 
   std::cout << "load images" << std::endl;
 
@@ -254,7 +189,8 @@ int main(int argc, char** argv)
   std::cout << "Calculating indices" << std::endl;
 
   auto shrinkRegion = image->GetLargestPossibleRegion();
-  shrinkRegion.ShrinkByRadius(radiusXY);
+  const agtk::Image3DSize radius3D = {radiusXY, radiusXY, 0};
+  shrinkRegion.ShrinkByRadius(radius3D);
   region.Crop(shrinkRegion);
 
   vector<agtk::Image3DIndex> indices;
@@ -284,6 +220,12 @@ int main(int argc, char** argv)
       }
     }
   }
+
+  //reorder like 'zxy'
+  //std::stable_sort(indices.begin(), indices.end(), [](agtk::Image3DIndex a, agtk::Image3DIndex b) // todo maybe use ordinal sort
+  //{
+  //  return a[2] != b[2] ? a[2] < b[2] : a[0] < b[0];
+  //});
   const int totalCount = indices.size();
 
   std::cout << "total count:" << totalCount << std::endl;
@@ -325,29 +267,34 @@ int main(int argc, char** argv)
   const int sliceSize = imageSize[0] * imageSize[1];
   const int lineSize = imageSize[1];
 
-  Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
-
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 
   for (int i = 0; i < totalCount / batchLength; ++i) { //todo fix last total%batch_size indices
     auto time0 = clock();
     std::cout << i << "th batch" << std::endl;
 
+    Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
 
+    //int lastX = -1; // we dont use last z and assume thay 'z' stay same
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       const auto& index = indices[i*batchLength + iTile];
+      //if (index[0] == lastX) { // x same as before
+      //concat new line(s) to last tile
+      //} else {
+      //make tile from the scratch
+      const int zOffset = index[2] * sliceSize;
+      const int xOffset = (index[0] - radiusXY + 1);
+      const int yOffsetPart = (index[1] - radiusXY + 1)* lineSize;
+      float* src = buffer + zOffset + yOffsetPart + xOffset;
 
-      for (int iRow = 0; iRow < 2 * radiusXY; iRow++) {
-        const int zOffset = index[2] * sliceSize;
-        const int yOffset = (index[1] - radiusXY + 1 + iRow)* lineSize;
-        const int xOffset = (index[0] - radiusXY + 1);
-        float* src = buffer + zOffset + yOffset + xOffset;
+      const int tileOffset = iTile*tileSize;
+      float* dst = blob->mutable_cpu_data() + tileOffset;
 
-        const int tileOffset = iTile*tileSize;
-        const int rowOffset = iRow*width;
-        float* dst = const_cast<float*>(blob->cpu_data()) + tileOffset + rowOffset;
-
+      for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
         memcpy(dst, src, lineSizeInBytes);
+
+        src += lineSize; // adjust yOffset
+        dst += width; // adjust lineOffset
       }
     }
 
@@ -359,54 +306,58 @@ int main(int argc, char** argv)
     auto time1 = clock();
 
     auto results = caffe_test_net.Forward(bottom, &type)[0]->cpu_data();
+    delete blob;
 
     auto time2 = clock();
     //Here I can use the argmax layer, but for now I do a simple for :)
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       auto& index = indices[i*batchLength + iTile];
 
-      /* use it for multiclass problem
       float max = 0;
-      float max_i = 0;
-      for (int j = 0; j < 2; ++j) {
-      float value = results->cpu_data()[iTile + j];
-      if (max < value){
-      max = value;
-      max_i = j;
-      }
-      }
-      std::cout << "max: " << max << " i " << max_i << std::endl;
-      */
-      char val;
-      if (results[iTile * 2 + 1] > results[iTile * 2]) {
-        val = 1;
-        tumCount++;
-      }
-      else {
-        val = 0;
+      int max_i = 0;
+      for (int j = 0; j < classCount; ++j) {
+        float value = results[classCount*iTile + j];
+        if (value > max) {
+          max = value;
+          max_i = j;
+        }
       }
 
+      int val = 0;
+
+      if (classCount == 4) {
+        const int TP = 2, FN = 3; // there are labels from last classificatoin onto 2 classes
+
+        if (max_i == TP || max_i == FN) { // TP,FN -> true, TN,FP ->false
+          val = 1;
+          tumCount++;
+        }
+      }
+      else {// if classCount == 2
+        if (max_i == 1) {
+          val = 1;
+          tumCount++;
+        }
+      }
       //set group's area
       for (int k = -groupX / 2; k < groupX - groupX / 2; ++k) {
         for (int l = -groupY / 2; l < groupY - groupY / 2; ++l) {
           agtk::Image3DSize offset = {k, l, 0};
           auto index2 = index + offset;
-          outImage->SetPixel(index2, val); // can be improved if only group 1x1 uses
+          outImage->SetPixel(index2, val); // can be improved if only group 1x1 used
         }
       }
 
       //
-      if (++itCount % 1000 == 0) {
+      if (++itCount % 10000 == 0) {
         std::cout << itCount << " / " << totalCount << "\n";
       }
     }
-    auto time3 = clock();
+
     std::cout << "load data: " << static_cast<double>(time1 - time0) / CLOCKS_PER_SEC << std::endl;
     std::cout << "classify: " << static_cast<double>(time2 - time1) / CLOCKS_PER_SEC << std::endl;
-    std::cout << "set data into image: " << static_cast<double>(time3 - time2) / CLOCKS_PER_SEC << std::endl;
 
   }
-  delete blob;
 
   std::cout << "tumors - " << tumCount << "\n";
 
