@@ -35,6 +35,10 @@ agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const ty
   agtk::Image3DSize size = {2 * halfSize, 2 * halfSize, 0};
   agtk::Image3DIndex start = {index[0] - halfSize + 1, index[1] - halfSize + 1, index[2]};
 
+  // check boundary
+  agtk::Image3DSize allSize = image->GetLargestPossibleRegion().GetSize();
+  agtk::Image3DIndex corner = start + size;
+
   typename ImageType3D::RegionType outputRegion;
   outputRegion.SetSize(size);
   outputRegion.SetIndex(start);
@@ -95,7 +99,6 @@ agtk::Image3DRegion getBinaryMaskBoundingBoxRegion(const agtk::BinaryImage3D* im
 
 int main(int argc, char** argv)
 {
-
   string model_file = argv[1];
   string trained_file = argv[2];
 
@@ -254,7 +257,8 @@ int main(int argc, char** argv)
   std::cout << "Calculating indices" << std::endl;
 
   auto shrinkRegion = image->GetLargestPossibleRegion();
-  shrinkRegion.ShrinkByRadius(radiusXY);
+  const agtk::Image3DSize radius3D = {radiusXY, radiusXY, 0};
+  shrinkRegion.ShrinkByRadius(radius3D);
   region.Crop(shrinkRegion);
 
   vector<agtk::Image3DIndex> indices;
@@ -325,7 +329,6 @@ int main(int argc, char** argv)
   const int sliceSize = imageSize[0] * imageSize[1];
   const int lineSize = imageSize[1];
 
-  Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 
@@ -333,6 +336,7 @@ int main(int argc, char** argv)
     auto time0 = clock();
     std::cout << i << "th batch" << std::endl;
 
+    Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
 
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       const auto& index = indices[i*batchLength + iTile];
@@ -345,11 +349,12 @@ int main(int argc, char** argv)
 
         const int tileOffset = iTile*tileSize;
         const int rowOffset = iRow*width;
-        float* dst = const_cast<float*>(blob->cpu_data()) + tileOffset + rowOffset;
+        float* dst = blob->mutable_cpu_data() + tileOffset + rowOffset;
 
         memcpy(dst, src, lineSizeInBytes);
       }
     }
+    //blob->Update();
 
     //fill the vector
     vector<Blob<float>*> bottom;
@@ -359,31 +364,31 @@ int main(int argc, char** argv)
     auto time1 = clock();
 
     auto results = caffe_test_net.Forward(bottom, &type)[0]->cpu_data();
+    delete blob;
 
     auto time2 = clock();
     //Here I can use the argmax layer, but for now I do a simple for :)
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       auto& index = indices[i*batchLength + iTile];
 
-      /* use it for multiclass problem
+      const int classCount = 4; // used 4 class problem
+
       float max = 0;
-      float max_i = 0;
-      for (int j = 0; j < 2; ++j) {
-      float value = results->cpu_data()[iTile + j];
-      if (max < value){
-      max = value;
-      max_i = j;
+      int max_i = 0;
+      for (int j = 0; j < classCount; ++j) {
+        float value = results[classCount*iTile + j];
+        if (value > max) {
+          max = value;
+          max_i = j;
+        }
       }
-      }
-      std::cout << "max: " << max << " i " << max_i << std::endl;
-      */
-      char val;
-      if (results[iTile * 2 + 1] > results[iTile * 2]) {
+      //std::cout << "max: " << max << " i " << max_i << std::endl;
+      const int TP = 2, FN = 3; // there are labels from last classificatoin onto 2 classes
+
+      int val = 0;
+      if (max_i == TP || max_i == FN) { // TP,FN -> true, TN,FP ->false
         val = 1;
         tumCount++;
-      }
-      else {
-        val = 0;
       }
 
       //set group's area
@@ -391,22 +396,20 @@ int main(int argc, char** argv)
         for (int l = -groupY / 2; l < groupY - groupY / 2; ++l) {
           agtk::Image3DSize offset = {k, l, 0};
           auto index2 = index + offset;
-          outImage->SetPixel(index2, val); // can be improved if only group 1x1 uses
+          outImage->SetPixel(index2, val); // can be improved if only group 1x1 used
         }
       }
 
       //
-      if (++itCount % 1000 == 0) {
+      if (++itCount % 10000 == 0) {
         std::cout << itCount << " / " << totalCount << "\n";
       }
     }
-    auto time3 = clock();
+
     std::cout << "load data: " << static_cast<double>(time1 - time0) / CLOCKS_PER_SEC << std::endl;
     std::cout << "classify: " << static_cast<double>(time2 - time1) / CLOCKS_PER_SEC << std::endl;
-    std::cout << "set data into image: " << static_cast<double>(time3 - time2) / CLOCKS_PER_SEC << std::endl;
 
   }
-  delete blob;
 
   std::cout << "tumors - " << tumCount << "\n";
 
