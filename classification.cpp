@@ -288,6 +288,12 @@ int main(int argc, char** argv)
       }
     }
   }
+
+  //reorder like 'zxy'
+  std::stable_sort(indices.begin(), indices.end(), [](agtk::Image3DIndex a, agtk::Image3DIndex b) // todo maybe use ordinal sort
+  {
+    return a[2] != b[2] ? a[2] < b[2] : a[0] < b[0];
+  });
   const int totalCount = indices.size();
 
   std::cout << "total count:" << totalCount << std::endl;
@@ -329,7 +335,6 @@ int main(int argc, char** argv)
   const int sliceSize = imageSize[0] * imageSize[1];
   const int lineSize = imageSize[1];
 
-
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 
   for (int i = 0; i < totalCount / batchLength; ++i) { //todo fix last total%batch_size indices
@@ -338,23 +343,31 @@ int main(int argc, char** argv)
 
     Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
 
+    //int lastX = -1; // we dont use last z and assume thay 'z' stay same
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       const auto& index = indices[i*batchLength + iTile];
+      //if (index[0] == lastX) { // x same as before
+      //concat new line(s) to last tile
+      //} else {
+      //make tile from the scratch
+      const int zOffset = index[2] * sliceSize;
+      const int xOffset = (index[0] - radiusXY + 1);
+      const int yOffsetPart = (index[1] - radiusXY + 1)* lineSize;
+      float* src = buffer + zOffset + yOffsetPart + xOffset;
 
-      for (int iRow = 0; iRow < 2 * radiusXY; iRow++) {
-        const int zOffset = index[2] * sliceSize;
-        const int yOffset = (index[1] - radiusXY + 1 + iRow)* lineSize;
-        const int xOffset = (index[0] - radiusXY + 1);
-        float* src = buffer + zOffset + yOffset + xOffset;
+      const int tileOffset = iTile*tileSize;
+      float* dst = blob->mutable_cpu_data() + tileOffset;
 
-        const int tileOffset = iTile*tileSize;
-        const int rowOffset = iRow*width;
-        float* dst = blob->mutable_cpu_data() + tileOffset + rowOffset;
+      for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
+        src += lineSize; // adjust yOffset
+        dst += width; // adjust lineOffset
 
         memcpy(dst, src, lineSizeInBytes);
+        std::cout << src - buffer << " -> " << dst - blob->mutable_cpu_data() << std::endl;
       }
+      std::cout << "===========================" << std::endl;
+      //}
     }
-    //blob->Update();
 
     //fill the vector
     vector<Blob<float>*> bottom;
