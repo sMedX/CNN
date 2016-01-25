@@ -359,13 +359,12 @@ int main(int argc, char** argv)
       float* dst = blob->mutable_cpu_data() + tileOffset;
 
       for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
+        memcpy(dst, src, lineSizeInBytes);
+        //std::cout << src - buffer << " -> " << dst - blob->mutable_cpu_data()<< std::endl;
         src += lineSize; // adjust yOffset
         dst += width; // adjust lineOffset
-
-        memcpy(dst, src, lineSizeInBytes);
-        std::cout << src - buffer << " -> " << dst - blob->mutable_cpu_data() << std::endl;
       }
-      std::cout << "===========================" << std::endl;
+      //std::cout << "===========================" << std::endl;
       //}
     }
 
