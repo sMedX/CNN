@@ -49,6 +49,8 @@ int main(int argc, char** argv)
   string mask_file = argv[17];
   string output_file = argv[18];
 
+  string deviceIdStr = argv[19];
+
   agtk::Image3DIndex start;
   start[0] = atoi(start_x_str.c_str());
   start[1] = atoi(start_y_str.c_str());
@@ -69,6 +71,7 @@ int main(int argc, char** argv)
   int groupX = atoi(groupXStr.c_str());
   int groupY = atoi(groupYStr.c_str());
   int classCount = atoi(classCountStr.c_str());
+  int deviceId = atoi(deviceIdStr.c_str());
 
   std::cout << "model_file = " << model_file << std::endl <<
     "trained_file =" << trained_file << std::endl <<
@@ -82,7 +85,8 @@ int main(int argc, char** argv)
     "classCount=" << classCount << std::endl <<
     "input_file = " << input_file << std::endl <<
     "mask_file =" << mask_file << std::endl <<
-    "output_file =" << output_file << std::endl;
+    "output_file =" << output_file << std::endl <<
+    "deviceID =" << deviceId << std::endl;
 
   if (classCount != 2 && classCount != 4) {
     std::cout << "classCount must be 2 or 4";
@@ -245,8 +249,7 @@ int main(int argc, char** argv)
 
   //Setting CPU or GPU
   Caffe::set_mode(Caffe::GPU);
-  const int device_id = 0;
-  Caffe::SetDevice(device_id);
+  Caffe::SetDevice(deviceId);
 
   //get the net
   Net<float> caffe_test_net(model_file, TEST);
