@@ -13,11 +13,147 @@
 #include <itkImageFileWriter.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
+#include <itkPngImageIOFactory.h>
 
 #include "C:/alex/agtk/Modules/Core/agtkResampling.h" //todo remove it or intergrate agtk
 
 #include "caffe/caffe.hpp"
 #include "caffe/blob.hpp"
+
+#include <itkTestingExtractSliceImageFilter.h>
+
+template <typename TPixel>
+agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 2>* image, const typename itk::Image<TPixel, 2>::IndexType& index, int halfSize)
+{
+  typedef itk::Image<TPixel, 2> ImageType2D;
+
+  typedef itk::Testing::ExtractSliceImageFilter<ImageType2D, agtk::UInt8Image2D> ExtractVolumeFilterType;
+
+  auto extractVolumeFilter = ExtractVolumeFilterType::New();
+  agtk::Image2DSize size = {2 * halfSize, 2 * halfSize};
+  agtk::Image2DIndex start = {index[0] - halfSize + 1, index[1] - halfSize + 1};
+
+  typename ImageType2D::RegionType outputRegion;
+  outputRegion.SetSize(size);
+  outputRegion.SetIndex(start);
+
+  extractVolumeFilter->SetInput(image);
+  extractVolumeFilter->SetExtractionRegion(outputRegion);
+  extractVolumeFilter->SetDirectionCollapseToGuess();
+  extractVolumeFilter->Update();
+
+  return extractVolumeFilter->GetOutput();
+}
+// validate each image in file formatted by lines as 'path label'
+int validateTileList(int argc, char** argv)
+{
+  using namespace caffe;
+
+  string modelFile = argv[1];
+  string trainedFile = argv[2];
+
+  string listFile = argv[3];
+
+  std::cout << "Applying CNN in deploy config" << std::endl;
+
+  //Setting CPU or GPU
+  Caffe::set_mode(Caffe::GPU);
+  Caffe::SetDevice(0);
+
+  //get the net
+  Net<float> caffe_test_net(modelFile, TEST);
+  //get trained net
+  caffe_test_net.CopyTrainedLayersFrom(trainedFile);
+
+  std::cout << "load images" << std::endl;
+  itk::PNGImageIOFactory::RegisterOneFactory();
+  auto registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
+
+  typedef itk::ImageFileReader<agtk::Int16Image2D> ReaderType;
+
+
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+
+  int classCount = 2;
+
+  int batchLength = 1;
+  int channels = 1;
+
+  std::ifstream infile(listFile);
+  std::string line;
+
+  while (std::getline(infile, line)) {
+    std::istringstream iss(line);
+
+    std::string imageFile;
+    int label;
+    iss >> imageFile;
+    iss >> label;
+
+    ReaderType::Pointer reader = ReaderType::New();
+    reader->SetFileName(imageFile);
+    try {
+      reader->Update();
+    }
+    catch (itk::ExceptionObject &excp) {
+      std::cout << "Exception thrown while reading the image " << std::endl;
+      std::cout << excp << std::endl;
+      return EXIT_FAILURE;
+    }
+    agtk::Int16Image2D::Pointer image16 = reader->GetOutput();
+
+    //std::cout << "cast image to float" << std::endl;
+    typedef itk::CastImageFilter<agtk::Int16Image2D, agtk::FloatImage2D> Cast;
+    auto cast = Cast::New();
+    cast->SetInput(image16);
+    cast->Update();
+    agtk::FloatImage2D::Pointer image = cast->GetOutput();
+
+    auto size = image->GetLargestPossibleRegion().GetSize();
+    size_t tileSize = size[0] * size[1];
+
+    //
+    Blob<float>* blob = new Blob<float>(batchLength, channels, size[0], size[0]);
+
+    float* dst = blob->mutable_cpu_data();
+    auto tile = image->GetBufferPointer();
+
+    memcpy(dst, tile, tileSize*sizeof(float));
+
+    //fill the vector
+    vector<Blob<float>*> bottom;
+    bottom.push_back(blob);
+    float type = 0.0;
+
+    auto results = caffe_test_net.Forward(bottom, &type)[0]->cpu_data();
+    delete blob;
+
+    float max = 0;
+    int max_i = 0;
+    for (int j = 0; j < classCount; ++j) {
+      float value = results[j];
+      if (value > max) {
+        max = value;
+        max_i = j;
+      }
+    }
+
+    int val = max_i;
+
+    if (val == 1 && label == 1) {
+      std::cout << "TP" << std::endl;
+    }
+    else if (val == 0 && label == 0) {
+      std::cout << "TN" << std::endl;
+    }
+    else if (val == 1 && label == 0) {
+      std::cout << "FP" << std::endl;
+    }
+    else // if (val == 0 && label == 1) {
+      std::cout << "FN" << std::endl;
+  }
+  return EXIT_SUCCESS;
+}
 
 int main(int argc, char** argv)
 {
@@ -51,17 +187,17 @@ int main(int argc, char** argv)
 
   string deviceIdStr = argv[19];
 
-  agtk::Image3DIndex start;
+  agtk::Image2DIndex start;
   start[0] = atoi(start_x_str.c_str());
   start[1] = atoi(start_y_str.c_str());
   start[2] = atoi(start_z_str.c_str());
 
-  agtk::Image3DSize size;
+  agtk::Image2DSize size;
   size[0] = atoi(size_x_str.c_str());
   size[1] = atoi(size_y_str.c_str());
-  size[2] = atoi(size_z_str.c_str());
+  //size[2] = atoi(size_z_str.c_str());
 
-  agtk::Image3DRegion region;
+  agtk::Image2DRegion region;
   region.SetIndex(start);
   region.SetSize(size);
 
@@ -96,14 +232,16 @@ int main(int argc, char** argv)
 
   itk::MetaImageIOFactory::RegisterOneFactory();
   itk::NrrdImageIOFactory::RegisterOneFactory();
+  itk::PNGImageIOFactory::RegisterOneFactory();
+
   std::cout << "nrrd factory registered" << std::endl;
 
   typedef std::list<itk::LightObject::Pointer> RegisteredObjectsContainerType;
   RegisteredObjectsContainerType registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
   std::cout << "there are " << registeredIOs.size() << " IO objects available to the ImageFileReader." << std::endl;
 
-  typedef itk::ImageFileReader<agtk::Int16Image3D> ReaderType;
-  typedef itk::ImageFileReader<agtk::BinaryImage3D> BinaryReaderType;
+  typedef itk::ImageFileReader<agtk::Int8Image2D> ReaderType;
+  typedef itk::ImageFileReader<agtk::BinaryImage2D> BinaryReaderType;
 
   ReaderType::Pointer reader = ReaderType::New();
   reader->SetFileName(input_file);
@@ -117,7 +255,7 @@ int main(int argc, char** argv)
   }
   std::cout << "." << std::endl;
 
-  agtk::BinaryImage3D::Pointer imageMask;
+  agtk::BinaryImage2D::Pointer imageMask;
   if (mask_file == "BOUNDING_BOX") {
     imageMask = nullptr;
   }
@@ -136,52 +274,52 @@ int main(int argc, char** argv)
   }
   std::cout << "." << std::endl;
 
-  agtk::Int16Image3D::Pointer image16 = reader->GetOutput();
+  agtk::Int8Image2D::Pointer image16 = reader->GetOutput();
 
   std::cout << "preprocess images" << std::endl;
   std::cout << "shift, scale images" << std::endl;
 
-  if (preset == "pancreas") {
-    const int shift = 190;// b
-    const int squeeze = 2;// a
+  //if (preset == "pancreas") {
+  //  const int shift = 190;// b
+  //  const int squeeze = 2;// a
 
-    // x' = (x + b)/a
-    itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
-    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-      it.Set((it.Get() + shift) / squeeze);
-    }
-  }
-  else if (preset == "livertumors") {
-    const int shift = 40;
+  //  // x' = (x + b)/a
+  //  itk::ImageRegionIterator<agtk::Int16Image2D> it(image16, image16->GetLargestPossibleRegion());
+  //  for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+  //    it.Set((it.Get() + shift) / squeeze);
+  //  }
+  //}
+  //else if (preset == "livertumors") {
+  //  const int shift = 40;
 
-    // x'= x + shift
-    itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
-    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-      it.Set(it.Get() + shift);
-    }
-  }
+  //  // x'= x + shift
+  //  itk::ImageRegionIterator<agtk::Int16Image2D> it(image16, image16->GetLargestPossibleRegion());
+  //  for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+  //    it.Set(it.Get() + shift);
+  //  }
+  //}
 
-  if (spacingXY != 0) {
-    std::cout << "resample image's axial slices" << std::endl;
+  //if (spacingXY != 0) {
+  //  std::cout << "resample image's axial slices" << std::endl;
 
-    agtk::Image3DSpacing spacing;
-    spacing[0] = spacingXY;
-    spacing[1] = spacingXY;
-    spacing[2] = image16->GetSpacing()[2];
+  //  agtk::Image2DSpacing spacing;
+  //  spacing[0] = spacingXY;
+  //  spacing[1] = spacingXY;
+  //  spacing[2] = image16->GetSpacing()[2];
 
-    image16 = agtk::resampling(image16.GetPointer(), spacing);
+  //  image16 = agtk::resampling(image16.GetPointer(), spacing);
 
-    if (imageMask != nullptr) {
-      imageMask = agtk::resamplingBinary(imageMask.GetPointer(), spacing);
-    }
-  }
+  //  if (imageMask != nullptr) {
+  //    imageMask = agtk::resamplingBinary(imageMask.GetPointer(), spacing);
+  //  }
+  //}
 
   std::cout << "cast image to float" << std::endl;
-  typedef itk::CastImageFilter<agtk::Int16Image3D, agtk::FloatImage3D> Cast;
+  typedef itk::CastImageFilter<agtk::Int8Image2D, agtk::FloatImage2D> Cast;
   auto cast = Cast::New();
   cast->SetInput(image16);
   cast->Update();
-  agtk::FloatImage3D::Pointer image = cast->GetOutput();
+  agtk::FloatImage2D::Pointer image = cast->GetOutput();
   if (imageMask != nullptr) {
     if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
       std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
@@ -193,15 +331,15 @@ int main(int argc, char** argv)
   std::cout << "Calculating indices" << std::endl;
 
   auto shrinkRegion = image->GetLargestPossibleRegion();
-  const agtk::Image3DSize radius3D = {radiusXY, radiusXY, 0};
-  shrinkRegion.ShrinkByRadius(radius3D);
+  const agtk::Image2DSize radius2D = {radiusXY, radiusXY};
+  shrinkRegion.ShrinkByRadius(radius2D);
   region.Crop(shrinkRegion);
 
-  vector<agtk::Image3DIndex> indices;
+  vector<agtk::Image2DIndex> indices;
   std::cout << "region: " << region << std::endl;
   if (imageMask.IsNotNull()) {
     std::cout << "use mask" << std::endl;
-    itk::ImageRegionConstIterator<agtk::BinaryImage3D> itMask(imageMask, region);
+    itk::ImageRegionConstIterator<agtk::BinaryImage2D> itMask(imageMask, region);
 
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
       if (itMask.Get() != 0) {
@@ -215,7 +353,7 @@ int main(int argc, char** argv)
   }
   else {
     std::cout << "not use mask" << std::endl;
-    itk::ImageRegionConstIterator<agtk::FloatImage3D> itMask(image, region);
+    itk::ImageRegionConstIterator<agtk::FloatImage2D> itMask(image, region);
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
       //take central pixel of group
       auto& index = itMask.GetIndex();
@@ -226,7 +364,7 @@ int main(int argc, char** argv)
   }
 
   //reorder like 'zxy'
-  //std::stable_sort(indices.begin(), indices.end(), [](agtk::Image3DIndex a, agtk::Image3DIndex b) // todo maybe use ordinal sort
+  //std::stable_sort(indices.begin(), indices.end(), [](agtk::Image2DIndex a, agtk::Image2DIndex b) // todo maybe use ordinal sort
   //{
   //  return a[2] != b[2] ? a[2] < b[2] : a[0] < b[0];
   //});
@@ -234,7 +372,7 @@ int main(int argc, char** argv)
 
   std::cout << "total count:" << totalCount << std::endl;
 
-  agtk::BinaryImage3D::Pointer outImage = agtk::BinaryImage3D::New();
+  agtk::BinaryImage2D::Pointer outImage = agtk::BinaryImage2D::New();
   outImage->CopyInformation(image);
   outImage->SetRegions(image->GetLargestPossibleRegion());
   outImage->Allocate();
@@ -256,19 +394,18 @@ int main(int argc, char** argv)
   //get trained net
   caffe_test_net.CopyTrainedLayersFrom(trained_file);
 
-  float* buffer = image->GetBufferPointer();
+  //float* buffer = image->GetBufferPointer();
 
   const int channels = 1;
   // tile's properties
   const int height = 2 * radiusXY;
   const int width = 2 * radiusXY;
   const int tileSize = width*height;
-  const int lineSizeInBytes = 2 * radiusXY*sizeof(float);
+  //const int lineSizeInBytes = 2 * radiusXY*sizeof(float);
 
   // image's properties
-  const auto& imageSize = image->GetLargestPossibleRegion().GetSize();
-  const int sliceSize = imageSize[0] * imageSize[1];
-  const int lineSize = imageSize[1];
+  //const auto& imageSize = image->GetLargestPossibleRegion().GetSize();
+  //const int lineSize = imageSize[1];
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 
@@ -278,27 +415,28 @@ int main(int argc, char** argv)
 
     Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
 
-    //int lastX = -1; // we dont use last z and assume thay 'z' stay same
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       const auto& index = indices[i*batchLength + iTile];
-      //if (index[0] == lastX) { // x same as before
-      //concat new line(s) to last tile
-      //} else {
-      //make tile from the scratch
-      const int zOffset = index[2] * sliceSize;
-      const int xOffset = (index[0] - radiusXY + 1);
-      const int yOffsetPart = (index[1] - radiusXY + 1)* lineSize;
-      float* src = buffer + zOffset + yOffsetPart + xOffset;
+      ////if (index[0] == lastX) { // x same as before
+      ////concat new line(s) to last tile
+      ////} else {
+      ////make tile from the scratch
+      //const int xOffset = (index[0] - radiusXY + 1);
+      //const int yOffsetPart = (index[1] - radiusXY + 1)* lineSize;
+      //float* src = buffer + yOffsetPart + xOffset;
 
       const int tileOffset = iTile*tileSize;
       float* dst = blob->mutable_cpu_data() + tileOffset;
 
-      for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
-        memcpy(dst, src, lineSizeInBytes);
+      //for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
+      //  memcpy(dst, src, lineSizeInBytes);
 
-        src += lineSize; // adjust yOffset
-        dst += width; // adjust lineOffset
-      }
+      //  src += lineSize; // adjust yOffset
+      //  dst += width; // adjust lineOffset
+      //}
+      auto tile = getTile(image.GetPointer(), index, radiusXY)->GetBufferPointer();
+
+      memcpy(dst, tile, tileSize*sizeof(float));
     }
 
     //fill the vector
@@ -328,25 +466,15 @@ int main(int argc, char** argv)
 
       int val = 0;
 
-      if (classCount == 4) {
-        const int TP = 2, FN = 3; // there are labels from last classificatoin onto 2 classes
+      if (max_i == 1) {
+        val = 255;
+        tumCount++;
+      }
 
-        if (max_i == TP || max_i == FN) { // TP,FN -> true, TN,FP ->false
-          val = 1;
-          tumCount++;
-        }
-      }
-      else {// if classCount == 2
-        if (max_i == 1) {
-          val = 1;
-          tumCount++;
-        }
-      }
       //set group's area
       for (int k = -groupX / 2; k < groupX - groupX / 2; ++k) {
         for (int l = -groupY / 2; l < groupY - groupY / 2; ++l) {
-          agtk::Image3DSize offset = {k, l, 0};
-          auto index2 = index + offset;
+          agtk::Image2DIndex index2 = {index[0] + k, index[1] + l};
           outImage->SetPixel(index2, val); // can be improved if only group 1x1 used
         }
       }
@@ -364,7 +492,7 @@ int main(int argc, char** argv)
 
   std::cout << "tumors - " << tumCount << "\n";
 
-  typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
+  typedef itk::ImageFileWriter<agtk::BinaryImage2D>  writerType;
   writerType::Pointer writer = writerType::New();
   writer->SetFileName(output_file);
   writer->SetInput(outImage);
