@@ -13,5 +13,6 @@ message(STATUS ${AGTK_LIBRARIES})
 
 add_subdirectory(validation)
 add_subdirectory(postprocessing)
+add_subdirectory(utils)
 
 add_custom_target(for-caffe)
