@@ -47,6 +47,6 @@ int main(int argc, char** argv)
   thresholdFilter->SetOutsideValue(0);
 
   //save
-  writeImage(thresholdFilter->GetOutput(), imageFile + "gaussian" + std::to_string(gaussianVariance) + ".nrrd");
+  writeImage(thresholdFilter->GetOutput(), imageFile + "-gaussian" + std::to_string(gaussianVariance) + ".nrrd");
   return EXIT_SUCCESS;
 }
