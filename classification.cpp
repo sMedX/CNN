@@ -21,13 +21,14 @@
 #include "caffe/blob.hpp"
 
 #include <itkTestingExtractSliceImageFilter.h>
+#include <regex>
 
 template <typename TPixel>
-agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 2>* image, const typename itk::Image<TPixel, 2>::IndexType& index, int halfSize)
+agtk::FloatImage2D::Pointer getTile(const itk::Image<TPixel, 2>* image, const typename itk::Image<TPixel, 2>::IndexType& index, int halfSize)
 {
   typedef itk::Image<TPixel, 2> ImageType2D;
 
-  typedef itk::Testing::ExtractSliceImageFilter<ImageType2D, agtk::UInt8Image2D> ExtractVolumeFilterType;
+  typedef itk::Testing::ExtractSliceImageFilter<ImageType2D, agtk::FloatImage2D> ExtractVolumeFilterType;
 
   auto extractVolumeFilter = ExtractVolumeFilterType::New();
   agtk::Image2DSize size = {2 * halfSize, 2 * halfSize};
@@ -44,7 +45,9 @@ agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 2>* image, const ty
 
   return extractVolumeFilter->GetOutput();
 }
+
 // validate each image in file formatted by lines as 'path label'
+// now it made combining to full-sized image from tiles. dbg porposes
 int validateTileList(int argc, char** argv)
 {
   using namespace caffe;
@@ -71,6 +74,11 @@ int validateTileList(int argc, char** argv)
 
   typedef itk::ImageFileReader<agtk::Int16Image2D> ReaderType;
 
+  agtk::BinaryImage2D::Pointer out = agtk::BinaryImage2D::New();
+  agtk::Image2DSize size = {{575, 529}};
+  out->SetRegions(size);
+  out->Allocate();
+  out->FillBuffer(128);
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 
@@ -89,7 +97,19 @@ int validateTileList(int argc, char** argv)
     int label;
     iss >> imageFile;
     iss >> label;
+    //std::cout << "imageFile:" << imageFile << std::endl;
 
+    //extract index
+    std::regex ws_re("[\/._]+"); // whitespace
+    std::vector<std::string> tokens;
+    std::copy(std::sregex_token_iterator(imageFile.begin(), imageFile.end(), ws_re, -1),
+      std::sregex_token_iterator(),
+      std::back_inserter(tokens));
+
+    agtk::Image2DIndex index = {atoi(tokens[6].c_str()), atoi(tokens[7].c_str())}; //6,7 is last and pre-last items in path
+    std::cout << index << std::endl;
+
+    //
     ReaderType::Pointer reader = ReaderType::New();
     reader->SetFileName(imageFile);
     try {
@@ -139,24 +159,47 @@ int validateTileList(int argc, char** argv)
     }
 
     int val = max_i;
+    //std::cout << val << std::endl;
 
-    if (val == 1 && label == 1) {
-      std::cout << "TP" << std::endl;
-    }
-    else if (val == 0 && label == 0) {
-      std::cout << "TN" << std::endl;
-    }
-    else if (val == 1 && label == 0) {
-      std::cout << "FP" << std::endl;
-    }
-    else // if (val == 0 && label == 1) {
-      std::cout << "FN" << std::endl;
+    //
+    out->SetPixel(index, val * 255);
+    //
+    //  if (val == 1 && label == 1) {
+    //    std::cout << "TP" << std::endl;
+    //  }
+    //  else if (val == 0 && label == 0) {
+    //    std::cout << "TN" << std::endl;
+    //  }
+    //  else if (val == 1 && label == 0) {
+    //    std::cout << "FP" << std::endl;
+    //  }
+    //  else // if (val == 0 && label == 1) {
+    //    std::cout << "FN" << std::endl;
+    //  }
   }
+
+  //
+  typedef itk::ImageFileWriter<agtk::BinaryImage2D>  writerType;
+  writerType::Pointer writer = writerType::New();
+  writer->SetFileName("tilesCombined.png");
+  writer->SetInput(out);
+  try {
+    writer->Update();
+  }
+  catch (itk::ExceptionObject &excp) {
+    std::cout << "Exception thrown while writing " << std::endl;
+    std::cout << excp << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  //
   return EXIT_SUCCESS;
 }
 
 int main(int argc, char** argv)
 {
+  //return validateTileList(argc, argv);
+
   using namespace caffe;
 
   string model_file = argv[1];
@@ -240,7 +283,7 @@ int main(int argc, char** argv)
   RegisteredObjectsContainerType registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
   std::cout << "there are " << registeredIOs.size() << " IO objects available to the ImageFileReader." << std::endl;
 
-  typedef itk::ImageFileReader<agtk::Int8Image2D> ReaderType;
+  typedef itk::ImageFileReader<agtk::Int16Image2D> ReaderType;
   typedef itk::ImageFileReader<agtk::BinaryImage2D> BinaryReaderType;
 
   ReaderType::Pointer reader = ReaderType::New();
@@ -274,7 +317,7 @@ int main(int argc, char** argv)
   }
   std::cout << "." << std::endl;
 
-  agtk::Int8Image2D::Pointer image16 = reader->GetOutput();
+  agtk::Int16Image2D::Pointer image16 = reader->GetOutput();
 
   std::cout << "preprocess images" << std::endl;
   std::cout << "shift, scale images" << std::endl;
@@ -315,7 +358,7 @@ int main(int argc, char** argv)
   //}
 
   std::cout << "cast image to float" << std::endl;
-  typedef itk::CastImageFilter<agtk::Int8Image2D, agtk::FloatImage2D> Cast;
+  typedef itk::CastImageFilter<agtk::Int16Image2D, agtk::FloatImage2D> Cast;
   auto cast = Cast::New();
   cast->SetInput(image16);
   cast->Update();
@@ -405,7 +448,7 @@ int main(int argc, char** argv)
 
   // image's properties
   //const auto& imageSize = image->GetLargestPossibleRegion().GetSize();
-  //const int lineSize = imageSize[1];
+  //const int lineSize = imageSize[0];
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 
@@ -434,9 +477,17 @@ int main(int argc, char** argv)
       //  src += lineSize; // adjust yOffset
       //  dst += width; // adjust lineOffset
       //}
-      auto tile = getTile(image.GetPointer(), index, radiusXY)->GetBufferPointer();
-
-      memcpy(dst, tile, tileSize*sizeof(float));
+      auto tile = getTile(image.GetPointer(), index, radiusXY);
+      //
+      //std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]);
+      //std::string filename = "D:\\alex\\USI_tumor\\aug242015205152\\tiles\\" + indexStr + ".png";
+      //typedef itk::ImageFileWriter<agtk::BinaryImage2D>  writerType;
+      //writerType::Pointer writer = writerType::New();
+      //writer->SetFileName(filename);
+      //writer->SetInput(tile);
+      //writer->Update();
+      //
+      memcpy(dst, tile->GetBufferPointer(), tileSize*sizeof(float));
     }
 
     //fill the vector
@@ -454,22 +505,22 @@ int main(int argc, char** argv)
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       auto& index = indices[i*batchLength + iTile];
 
-      float max = 0;
-      int max_i = 0;
-      for (int j = 0; j < classCount; ++j) {
-        float value = results[classCount*iTile + j];
-        if (value > max) {
-          max = value;
-          max_i = j;
-        }
-      }
+      //float max = 0;
+      //int max_i = 0;
+      //for (int j = 0; j < classCount; ++j) {
+      //  float value = results[classCount*iTile + j];
+      //  if (value > max) {
+      //    max = value;
+      //    max_i = j;
+      //  }
+      //}
 
-      int val = 0;
+      int val = 255 * (results[2 * iTile + 1] - results[2 * iTile] + 1) / 2;
 
-      if (max_i == 1) {
-        val = 255;
-        tumCount++;
-      }
+      //if (max_i == 1) {
+      //  val = 255;
+      //  tumCount++;
+      //}
 
       //set group's area
       for (int k = -groupX / 2; k < groupX - groupX / 2; ++k) {
