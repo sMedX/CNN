@@ -26,6 +26,8 @@ int main(int argc, char* argv[])
   //const int STUDY_CONTROL_RATIO = 10;
   const std::string ext = ".png";
   const int negativeStride = 10;
+  const std::string BOUNDING_BOX = "BOUNDING_BOX";
+  const std::string NO_MASK = "NO_MASK";
 
   /** Create a command line argument parser. */
   CommandLineArgumentParser::Pointer parser = CommandLineArgumentParser::New();
@@ -88,7 +90,7 @@ int main(int argc, char* argv[])
 
   //int c = 0;
 
-#pragma omp parallel for
+  #pragma omp parallel for
   for (int iImage = 0; iImage < inputData.size(); ++iImage) {
     auto& input = inputData[iImage];
     auto imageFile = input[0];
@@ -114,15 +116,15 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    bool useBoundingBox = true;
+    bool isBoundingBox = maskFile == BOUNDING_BOX;
+    bool isNoMask = maskFile == NO_MASK;
     BinaryImage3D::Pointer mask = BinaryImage3D::New();
-    if (!maskFile.empty()) {
+    if (!(isBoundingBox || isNoMask)) {
       std::cout << "load mask" << std::endl;
       if (!readImage(mask, maskFile)) {
-        std::cout << "can't read " << maskFile << ". bounding box will be used instead mask.";
+        std::cout << "can't read " << maskFile << std::endl;
         continue;
       }
-      useBoundingBox = false;
     }
 
     std::cout << "preprocess images" << std::endl;
@@ -173,12 +175,12 @@ int main(int argc, char* argv[])
     std::cout << "calculate indices" << std::endl;
     std::vector<BinaryImage3D::IndexType> indices;
 
-    auto shrinkRegion = mask->GetLargestPossibleRegion();
+    auto shrinkRegion = image->GetLargestPossibleRegion();
     shrinkRegion.ShrinkByRadius(radius);
 
     int negativeCount = 0;
 
-    if (useBoundingBox) {
+    if (isBoundingBox) {
       auto region = getBinaryMaskBoundingBoxRegion(label);
       region.Crop(shrinkRegion);
       std::cout << "use bounding box: " << region << std::endl;
@@ -197,7 +199,21 @@ int main(int argc, char* argv[])
         }
       }
     }
-    else {
+    else if (isNoMask) { // this part can be removed when ordinal white image will be used as mask
+      std::cout << "don't mask" << std::endl;
+      itk::ImageRegionConstIterator<BinaryImage3D> it(label, shrinkRegion);
+      for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+        if (label->GetPixel(it.GetIndex()) == 0) {// if negative
+          if (negativeCount % negativeStride == 0) {
+            indices.push_back(it.GetIndex());
+          }
+          negativeCount++;
+        }
+        else {
+          indices.push_back(it.GetIndex());
+        }
+      }
+    } else {
       std::cout << "use mask" << std::endl;
       itk::ImageRegionConstIterator<BinaryImage3D> itMask(mask, shrinkRegion);
 
