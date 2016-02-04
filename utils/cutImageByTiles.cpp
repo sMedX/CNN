@@ -23,9 +23,8 @@ int main(int argc, char* argv[])
 {
   using namespace agtk;
 
-  //const int STUDY_CONTROL_RATIO = 10;
   const std::string ext = ".png";
-  const int negativeStride = 10;
+  const int negativeStride = 4;
   const std::string BOUNDING_BOX = "BOUNDING_BOX";
   const std::string NO_MASK = "NO_MASK";
 
@@ -33,8 +32,17 @@ int main(int argc, char* argv[])
   CommandLineArgumentParser::Pointer parser = CommandLineArgumentParser::New();
   parser->SetCommandLineArguments(argc, argv);
 
+  std::string imageName;
+  parser->GetValue("-imageName", imageName);
+
+  std::string labelName;
+  parser->GetValue("-labelName", labelName);
+
+  std::string maskName;
+  parser->GetValue("-maskName", maskName);
+
   std::string listFile;
-  parser->GetValue("-listFile", listFile);
+  parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
 
   int radius;
   parser->GetValue("-radius", radius);
@@ -53,6 +61,9 @@ int main(int argc, char* argv[])
   parser->GetValue("-folder", outputFolder);
 
   std::cout << "list file  " << listFile << std::endl;
+  std::cout << "imageName  " << imageName << std::endl;
+  std::cout << "labelName  " << labelName << std::endl;
+  std::cout << "maskName  " << maskName << std::endl;
   std::cout << "output folder  " << outputFolder << std::endl;
 
   std::cout << std::endl;
@@ -63,24 +74,23 @@ int main(int argc, char* argv[])
 
   std::cout << std::endl;
   std::cout << "stride for negative points is " << negativeStride << std::endl;
-  //std::cout << "study/control ratio is " << STUDY_CONTROL_RATIO << std::endl;
 
-  std::vector<std::vector<std::string> > inputData; // {imageFile, labelFile, maskFile}
+  bool isNoMask = false;
+  bool isBoundingBox = false;
+  if (maskName == NO_MASK) {
+    isNoMask = true;
+  } else if (maskName == BOUNDING_BOX) {
+    isBoundingBox = true;
+  }
+  std::vector<std::string> inputDirs;
 
   ifstream infile(listFile);
   std::string line;
 
   while (std::getline(infile, line)) {
-    std::istringstream iss(line);
-
-    std::string image, label, mask;
-    iss >> image;
-    iss >> label;
-    iss >> mask;
-
-    inputData.push_back({ image, label, mask });
+    inputDirs.push_back(line);
   }
-  std::cout << "inputData.size() " << inputData.size() << std::endl;
+  std::cout << "inputData.size() " << inputDirs.size() << std::endl;
 
   // set up output directories
   system((std::string("md ") + outputFolder).c_str());
@@ -91,11 +101,11 @@ int main(int argc, char* argv[])
   //int c = 0;
 
   #pragma omp parallel for
-  for (int iImage = 0; iImage < inputData.size(); ++iImage) {
-    auto& input = inputData[iImage];
-    auto imageFile = input[0];
-    auto labelFile = input[1];
-    auto maskFile = input[2];
+  for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
+    auto inputDir = inputDirs[iImage];
+    auto imageFile = inputDir + "/" + imageName;
+    auto labelFile = inputDir + "/" + labelName;
+    auto maskFile = inputDir + "/" + maskName;
 
     std::cout << "imageFile " << imageFile << std::endl;
     std::cout << "labelFile " << labelFile << std::endl;
@@ -116,8 +126,6 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    bool isBoundingBox = maskFile == BOUNDING_BOX;
-    bool isNoMask = maskFile == NO_MASK;
     BinaryImage3D::Pointer mask = BinaryImage3D::New();
     if (!(isBoundingBox || isNoMask)) {
       std::cout << "load mask" << std::endl;
@@ -239,16 +247,13 @@ int main(int argc, char* argv[])
     std::cout << "totalCount: " << totalCount << std::endl;
 
     // set up output directories
-    const int numLength = 3; // like 002
-    std::string iImageStr = std::to_string(iImage);
-    iImageStr = std::string(numLength - iImageStr.length(), '0').append(iImageStr); // append leading zeros
-
+    std::string iImageStr = inputDir.substr(inputDir.length() - 3);//take 3 last chars, e.g. 012
     const std::string pos = "tum", neg = "notum";
-    std::string dir = outputFolder + "\\" + iImageStr + "\\";
-    system((std::string("md ") + dir).c_str());
+    std::string outDir = outputFolder + "\\" + iImageStr + "\\";
+    system((std::string("md ") + outDir).c_str());
 
-    system((std::string("md ") + dir + pos).c_str());
-    system((std::string("md ") + dir + neg).c_str());
+    system((std::string("md ") + outDir + pos).c_str());
+    system((std::string("md ") + outDir + neg).c_str());
 
     for (int j = 0; j < totalCount; ++j) {
       auto& index = indices[j];
@@ -258,7 +263,7 @@ int main(int argc, char* argv[])
       std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]) + "_" + std::to_string(index[2]);
       auto labelI = label->GetPixel(index);
       std::string labelStr = labelI == 0 ? "notum" : "tum";
-      std::string filename = dir + labelStr + "\\" + indexStr + ext;
+      std::string filename = outDir + labelStr + "\\" + indexStr + ext;
 
       writeImage(tile.GetPointer(), filename);
 
