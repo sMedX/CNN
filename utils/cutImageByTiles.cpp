@@ -9,6 +9,8 @@
 #include <itkImage.h>
 #include <itkTestingExtractSliceImageFilter.h>
 #include <itkAddImageFilter.h>
+#include <itkMetaImageIOFactory.h>
+#include <itkNrrdImageIOFactory.h>
 
 #include "agtkTypes.h"
 #include "agtkIO.h"
@@ -28,6 +30,24 @@ int main(int argc, char* argv[])
   const std::string BOUNDING_BOX = "BOUNDING_BOX";
   const std::string NO_MASK = "NO_MASK";
 
+  std::string TP, TN, FP, FN; //for 4classes
+  TP = "TP";
+  TN = "TN";
+  FP = "FP";
+  FN = "FN";
+
+  std::string positive, negative; //for 2classes
+  positive = "pos";
+  negative = "neg";
+
+  itk::MetaImageIOFactory::RegisterOneFactory();
+  itk::NrrdImageIOFactory::RegisterOneFactory();
+  std::cout << "nrrd factory registered" << std::endl;
+
+  typedef std::list<itk::LightObject::Pointer> RegisteredObjectsContainerType;
+  RegisteredObjectsContainerType registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
+  std::cout << "there are " << registeredIOs.size() << " IO objects available to the ImageFileReader." << std::endl;
+
   /** Create a command line argument parser. */
   CommandLineArgumentParser::Pointer parser = CommandLineArgumentParser::New();
   parser->SetCommandLineArguments(argc, argv);
@@ -40,6 +60,9 @@ int main(int argc, char* argv[])
 
   std::string maskName;
   parser->GetValue("-maskName", maskName);
+
+  std::string adaptiveName; //name of adaptive image i.e. result of previous classification
+  parser->GetValue("-adaptive", adaptiveName);
 
   std::string listFile;
   parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
@@ -64,6 +87,7 @@ int main(int argc, char* argv[])
   std::cout << "imageName  " << imageName << std::endl;
   std::cout << "labelName  " << labelName << std::endl;
   std::cout << "maskName  " << maskName << std::endl;
+  std::cout << "adaptiveName  " << adaptiveName << std::endl;
   std::cout << "output folder  " << outputFolder << std::endl;
 
   std::cout << std::endl;
@@ -103,13 +127,17 @@ int main(int argc, char* argv[])
   #pragma omp parallel for
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
     auto inputDir = inputDirs[iImage];
-    auto imageFile = inputDir + "/" + imageName;
-    auto labelFile = inputDir + "/" + labelName;
-    auto maskFile = inputDir + "/" + maskName;
+    auto imageFile = inputDir + "\\" + imageName;
+    auto labelFile = inputDir + "\\" + labelName;
+    auto maskFile = inputDir + "\\" + maskName;
+    auto adaptiveFile = inputDir + "\\" + adaptiveName;
 
     std::cout << "imageFile " << imageFile << std::endl;
     std::cout << "labelFile " << labelFile << std::endl;
     std::cout << "maskFile " << maskFile << std::endl;
+    std::cout << "adaptiveFile " << adaptiveFile << std::endl;
+
+    bool is4Classes = !adaptiveName.empty();
 
     // read images
     std::cout << "load image" << std::endl;
@@ -134,6 +162,17 @@ int main(int argc, char* argv[])
         continue;
       }
     }
+
+    BinaryImage3D::Pointer adaptive = BinaryImage3D::New();
+    if (is4Classes) {
+      std::cout << "load adaptive" << std::endl;
+      if (!readImage(adaptive, adaptiveFile)) {
+        std::cout << "can't read " << adaptiveFile << std::endl;
+        continue;
+      }
+    }
+
+    //todo add check for equal size
 
     std::cout << "preprocess images" << std::endl;
     std::cout << "shift, sqeeze" << std::endl;
@@ -174,17 +213,28 @@ int main(int argc, char* argv[])
 
       image = resampling(image.GetPointer(), spacing);
       label = resamplingBinary(label.GetPointer(), spacing);
-
+      
       if (mask.IsNotNull()) {
         mask = resamplingBinary(mask.GetPointer(), spacing);
+      }
+
+      if (adaptive.IsNotNull()) {
+        adaptive = resamplingBinary(adaptive.GetPointer(), spacing);
       }
     }
 
     std::cout << "calculate indices" << std::endl;
     std::vector<BinaryImage3D::IndexType> indices;
 
-    auto shrinkRegion = image->GetLargestPossibleRegion();
-    shrinkRegion.ShrinkByRadius(radius);
+    const Image3DOffset radius3D = {radius, radius, 0};
+
+    //shrink by x and y only
+    Image3DIndex movedIndex = image->GetLargestPossibleRegion().GetIndex() + radius3D;
+    Image3DSize shrinkedSize;
+    for (size_t i = 0; i < Image3DRegion::ImageDimension; i++) {
+      shrinkedSize[i] = image->GetLargestPossibleRegion().GetSize()[i] - 2 * radius3D[i];
+    }
+    Image3DRegion shrinkRegion = {movedIndex, shrinkedSize};
 
     int negativeCount = 0;
 
@@ -252,8 +302,16 @@ int main(int argc, char* argv[])
     std::string outDir = outputFolder + "\\" + iImageStr + "\\";
     system((std::string("md ") + outDir).c_str());
 
-    system((std::string("md ") + outDir + pos).c_str());
-    system((std::string("md ") + outDir + neg).c_str());
+    if (is4Classes) {
+      system((std::string("md ") + outDir + TP).c_str());
+      system((std::string("md ") + outDir + TN).c_str());
+      system((std::string("md ") + outDir + FP).c_str());
+      system((std::string("md ") + outDir + FN).c_str());
+    }
+    else { //if 2 classes
+      system((std::string("md ") + outDir + pos).c_str());
+      system((std::string("md ") + outDir + neg).c_str());
+    }
 
     for (int j = 0; j < totalCount; ++j) {
       auto& index = indices[j];
@@ -262,7 +320,27 @@ int main(int argc, char* argv[])
       //save image
       std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]) + "_" + std::to_string(index[2]);
       auto labelI = label->GetPixel(index);
-      std::string labelStr = labelI == 0 ? "notum" : "tum";
+      std::string labelStr;
+      if (is4Classes) {
+        auto adaI = adaptive->GetPixel(index);
+        if (labelI == 1 && adaI == 1) {
+          labelStr = TP;
+        }
+        else if (labelI == 0 && adaI == 0) {
+          labelStr = TN;
+
+        }
+        else if (labelI == 0 && adaI == 1) {
+          labelStr = FP;
+
+        }
+        else {
+          labelStr = FN;
+
+        }
+      } else { // 2 classes
+        labelStr = labelI == 0 ? negative : positive;
+      }
       std::string filename = outDir + labelStr + "\\" + indexStr + ext;
 
       writeImage(tile.GetPointer(), filename);
@@ -271,10 +349,7 @@ int main(int argc, char* argv[])
         std::cout << static_cast<double>(j*100)/totalCount << "% of " << iImageStr << " image" << std::endl;
       }
     }
-
   }
-
-
   return EXIT_SUCCESS;
 };
 
