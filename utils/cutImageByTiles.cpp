@@ -30,15 +30,8 @@ int main(int argc, char* argv[])
   const std::string BOUNDING_BOX = "BOUNDING_BOX";
   const std::string NO_MASK = "NO_MASK";
 
-  std::string TP, TN, FP, FN; //for 4classes
-  TP = "TP";
-  TN = "TN";
-  FP = "FP";
-  FN = "FN";
-
-  std::string positive, negative; //for 2classes
-  positive = "pos";
-  negative = "neg";
+  const std::string TP = "TP", TN = "TN", FP = "FP", FN = "FN"; //for 4classes
+  const std::string positive = "pos", negative = "neg"; //for 2classes
 
   itk::MetaImageIOFactory::RegisterOneFactory();
   itk::NrrdImageIOFactory::RegisterOneFactory();
@@ -218,7 +211,7 @@ int main(int argc, char* argv[])
         mask = resamplingBinary(mask.GetPointer(), spacing);
       }
 
-      if (adaptive.IsNotNull()) {
+      if (is4Classes) {
         adaptive = resamplingBinary(adaptive.GetPointer(), spacing);
       }
     }
@@ -298,7 +291,6 @@ int main(int argc, char* argv[])
 
     // set up output directories
     std::string iImageStr = inputDir.substr(inputDir.length() - 3);//take 3 last chars, e.g. 012
-    const std::string pos = "tum", neg = "notum";
     std::string outDir = outputFolder + "\\" + iImageStr + "\\";
     system((std::string("md ") + outDir).c_str());
 
@@ -309,8 +301,8 @@ int main(int argc, char* argv[])
       system((std::string("md ") + outDir + FN).c_str());
     }
     else { //if 2 classes
-      system((std::string("md ") + outDir + pos).c_str());
-      system((std::string("md ") + outDir + neg).c_str());
+      system((std::string("md ") + outDir + positive).c_str());
+      system((std::string("md ") + outDir + negative).c_str());
     }
 
     for (int j = 0; j < totalCount; ++j) {
