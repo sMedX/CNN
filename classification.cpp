@@ -240,6 +240,15 @@ int main(int argc, char** argv)
   outImage->Allocate();
   outImage->FillBuffer(0);
 
+  std::vector<agtk::BinaryImage3D::Pointer> outImages;
+  for (size_t i = 0; i < classCount; i++) {
+    outImages.push_back(agtk::BinaryImage3D::New());
+    outImages[i]->CopyInformation(image);
+    outImages[i]->SetRegions(image->GetLargestPossibleRegion());
+    outImages[i]->Allocate();
+    outImages[i]->FillBuffer(0);
+  }
+
   std::cout << "." << std::endl;
 
   int itCount = 0;
@@ -324,6 +333,7 @@ int main(int argc, char** argv)
           max = value;
           max_i = j;
         }
+        outImages[j]->SetPixel(index, round(value));
       }
 
       int val = 0;
@@ -332,6 +342,12 @@ int main(int argc, char** argv)
         const int TP = 2, FN = 3; // there are labels from last classificatoin onto 2 classes
 
         if (max_i == TP || max_i == FN) { // TP,FN -> true, TN,FP ->false
+          val = 1;
+          tumCount++;
+        }
+      }
+      else if (classCount == 3) { // there are background, singularity in tumors, tumors
+        if (max_i != 0) {
           val = 1;
           tumCount++;
         }
@@ -359,7 +375,6 @@ int main(int argc, char** argv)
 
     std::cout << "load data: " << static_cast<double>(time1 - time0) / CLOCKS_PER_SEC << std::endl;
     std::cout << "classify: " << static_cast<double>(time2 - time1) / CLOCKS_PER_SEC << std::endl;
-
   }
 
   std::cout << "tumors - " << tumCount << "\n";
@@ -376,5 +391,14 @@ int main(int argc, char** argv)
     std::cout << excp << std::endl;
     return EXIT_FAILURE;
   }
+
+  for (size_t i = 0; i < classCount; i++) {
+    writerType::Pointer writerI = writerType::New();
+    writerI->SetFileName(output_file + std::to_string(i) + ".nrrd");
+    writerI->SetInput(outImages[i]);
+    writerI->Update();
+  }
+
+
   return EXIT_SUCCESS;
 }
