@@ -88,8 +88,8 @@ int main(int argc, char** argv)
     "output_file =" << output_file << std::endl <<
     "deviceID =" << deviceId << std::endl;
 
-  if (classCount != 2 && classCount != 4) {
-    std::cout << "classCount must be 2 or 4";
+  if (classCount < 1 && classCount > 3) {
+    std::cout << "classCount must be 1, 2, 3 or 4";
   }
 
   std::cout << "load images" << std::endl;
