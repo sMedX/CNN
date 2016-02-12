@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
   std::string labelName1;
   parser->GetValue("-labelName1", labelName1); //class under label '1'
 
-  std::string labelName2; //class under label '2' that fully contain class '1'
+  std::string labelName2; //class under label '2' that is entirely in class '1', optional
   parser->GetValue("-labelName2", labelName2);
 
   std::string maskName;
@@ -156,8 +156,10 @@ int main(int argc, char* argv[])
     std::cout << "load label2" << std::endl;
     BinaryImage3D::Pointer label2 = BinaryImage3D::New();
     if (!readImage(label2, labelFile2)) {
-      std::cout << "can't read " << labelFile2;
-      continue;
+      std::cout << "can't read " << labelFile2 << ". label2 will not be used." << std::endl;
+      label2->CopyInformation(label1); // make an empty image instead
+      label2->Allocate();
+      label2->FillBuffer(0);
     }
 
     BinaryImage3D::Pointer mask = BinaryImage3D::New();
