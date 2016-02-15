@@ -153,11 +153,19 @@ int main(int argc, char** argv)
   }
   else if (preset == "livertumors") {
     const int shift = 40;
+    agtk::UInt8Image3D::PixelType minValue = 0, maxValue = 255;
 
-    // x'= x + shift
+    // x' = x + shift
     itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
     for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-      it.Set(it.Get() + shift);
+      auto val = it.Get() + shift;
+      if (val < minValue) {
+        val = minValue;
+      }
+      else if (val > maxValue) {
+        val = maxValue;
+      }
+      it.Set(val);
     }
   }
 
