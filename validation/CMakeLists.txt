@@ -4,14 +4,17 @@ project(validation)
 include_directories(${AGTK_INCLUDE_DIRS})
 list(APPEND LIBRARIES ${AGTK_LIBRARIES})
 
+#
 set(SOURCES "validation.cpp")
 
 add_executable(validation ${SOURCES})
 
 TARGET_LINK_LIBRARIES(validation ${LIBRARIES} )
 
-###
+project(moveTumorHack)
 
-set(SOURCES "validationRetVOE.cpp")
-add_executable(validationRetVOE ${SOURCES})
-TARGET_LINK_LIBRARIES(validationRetVOE ${LIBRARIES} )
+set(SOURCES "moveTumorHack.cpp")
+
+add_executable(moveTumorHack ${SOURCES})
+
+TARGET_LINK_LIBRARIES(moveTumorHack ${LIBRARIES} )

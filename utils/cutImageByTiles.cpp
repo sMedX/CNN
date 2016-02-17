@@ -26,7 +26,6 @@ int main(int argc, char* argv[])
   using namespace agtk;
 
   const std::string ext = ".png";
-  const int negativeStride = 4;
   const std::string BOUNDING_BOX = "BOUNDING_BOX";
   const std::string NO_MASK = "NO_MASK";
 
@@ -48,8 +47,11 @@ int main(int argc, char* argv[])
   std::string imageName;
   parser->GetValue("-imageName", imageName);
 
-  std::string labelName;
-  parser->GetValue("-labelName", labelName);
+  std::string labelName1;
+  parser->GetValue("-labelName1", labelName1); //class under label '1'
+
+  std::string labelName2; //class under label '2' that is entirely in class '1', optional
+  parser->GetValue("-labelName2", labelName2);
 
   std::string maskName;
   parser->GetValue("-maskName", maskName);
@@ -73,12 +75,16 @@ int main(int argc, char* argv[])
   spacingXY.Fill(0);
   parser->GetITKValue("-spacingXY", spacingXY);
 
+  int strideNegative = 4; // additional stride for negative points
+  parser->GetValue("-strideNegative", strideNegative);
+
   std::string outputFolder;
   parser->GetValue("-folder", outputFolder);
 
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "imageName  " << imageName << std::endl;
-  std::cout << "labelName  " << labelName << std::endl;
+  std::cout << "labelName1  " << labelName1 << std::endl;
+  std::cout << "labelName2  " << labelName2 << std::endl;
   std::cout << "maskName  " << maskName << std::endl;
   std::cout << "adaptiveName  " << adaptiveName << std::endl;
   std::cout << "output folder  " << outputFolder << std::endl;
@@ -88,9 +94,7 @@ int main(int argc, char* argv[])
   std::cout << "stride " << stride << std::endl;
   std::cout << "preset " << preset << std::endl;
   std::cout << "spacingXY " << spacingXY << std::endl;
-
-  std::cout << std::endl;
-  std::cout << "stride for negative points is " << negativeStride << std::endl;
+  std::cout << "stride for negative points is " << strideNegative << std::endl;
 
   bool isNoMask = false;
   bool isBoundingBox = false;
@@ -121,16 +125,18 @@ int main(int argc, char* argv[])
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
     auto inputDir = inputDirs[iImage];
     auto imageFile = inputDir + "\\" + imageName;
-    auto labelFile = inputDir + "\\" + labelName;
+    auto labelFile1 = inputDir + "\\" + labelName1;
+    auto labelFile2 = inputDir + "\\" + labelName2;
     auto maskFile = inputDir + "\\" + maskName;
     auto adaptiveFile = inputDir + "\\" + adaptiveName;
 
     std::cout << "imageFile " << imageFile << std::endl;
-    std::cout << "labelFile " << labelFile << std::endl;
+    std::cout << "labelFile1 " << labelFile1 << std::endl;
+    std::cout << "labelFile2 " << labelFile2 << std::endl;
     std::cout << "maskFile " << maskFile << std::endl;
     std::cout << "adaptiveFile " << adaptiveFile << std::endl;
 
-    bool is4Classes = !adaptiveName.empty();
+    bool isAdaptiveClasses = !adaptiveName.empty();
 
     // read images
     std::cout << "load image" << std::endl;
@@ -140,11 +146,20 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    std::cout << "load label" << std::endl;
-    BinaryImage3D::Pointer label = BinaryImage3D::New();
-    if (!readImage(label, labelFile)) {
-      std::cout << "can't read " << labelFile;
+    std::cout << "load label1" << std::endl;
+    BinaryImage3D::Pointer label1 = BinaryImage3D::New();
+    if (!readImage(label1, labelFile1)) {
+      std::cout << "can't read " << labelFile1;
       continue;
+    }
+
+    std::cout << "load label2" << std::endl;
+    BinaryImage3D::Pointer label2 = BinaryImage3D::New();
+    if (!readImage(label2, labelFile2)) {
+      std::cout << "can't read " << labelFile2 << ". label2 will not be used." << std::endl;
+      label2->CopyInformation(label1); // make an empty image instead
+      label2->Allocate();
+      label2->FillBuffer(0);
     }
 
     BinaryImage3D::Pointer mask = BinaryImage3D::New();
@@ -157,7 +172,7 @@ int main(int argc, char* argv[])
     }
 
     BinaryImage3D::Pointer adaptive = BinaryImage3D::New();
-    if (is4Classes) {
+    if (isAdaptiveClasses) {
       std::cout << "load adaptive" << std::endl;
       if (!readImage(adaptive, adaptiveFile)) {
         std::cout << "can't read " << adaptiveFile << std::endl;
@@ -191,6 +206,21 @@ int main(int argc, char* argv[])
       }
     }
     std::cout << "cast (truncate)" << std::endl;
+    // force integer overflow
+    UInt8Image3D::PixelType minValue = 0, maxValue = 255;
+
+    itk::ImageRegionIterator<Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+      auto val = it.Get();
+      if (val < minValue) {
+        val = minValue;
+      }
+      else if (val > maxValue) {
+        val = maxValue;
+      }
+      it.Set(val);
+    }
+
     typedef itk::CastImageFilter<Int16Image3D, UInt8Image3D> Cast;
     auto cast = Cast::New();
     cast->SetInput(image16);
@@ -205,13 +235,14 @@ int main(int argc, char* argv[])
       spacing[2] = image->GetSpacing()[2];
 
       image = resampling(image.GetPointer(), spacing);
-      label = resamplingBinary(label.GetPointer(), spacing);
-      
+      label1 = resamplingBinary(label1.GetPointer(), spacing);
+      label2 = resamplingBinary(label2.GetPointer(), spacing);
+
       if (mask.IsNotNull()) {
         mask = resamplingBinary(mask.GetPointer(), spacing);
       }
 
-      if (is4Classes) {
+      if (isAdaptiveClasses) {
         adaptive = resamplingBinary(adaptive.GetPointer(), spacing);
       }
     }
@@ -230,62 +261,72 @@ int main(int argc, char* argv[])
     Image3DRegion shrinkRegion = {movedIndex, shrinkedSize};
 
     int negativeCount = 0;
+    int class1Count = 0;
+    int class2Count = 0;
 
-    if (isBoundingBox) {
-      auto region = getBinaryMaskBoundingBoxRegion(label);
+    if (isBoundingBox) { // not take in count 3-class problem
+      auto region = getBinaryMaskBoundingBoxRegion(label1);
       region.Crop(shrinkRegion);
       std::cout << "use bounding box: " << region << std::endl;
 
-      itk::ImageRegionConstIterator<BinaryImage3D> it(label, region);
+      itk::ImageRegionConstIterator<BinaryImage3D> itlabel(label1, region);
 
-      for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-        if (label->GetPixel(it.GetIndex()) == 0) {// if negative
-          if (negativeCount % negativeStride == 0) {
-            indices.push_back(it.GetIndex());
+      for (itlabel.GoToBegin(); !itlabel.IsAtEnd(); ++itlabel) {
+        if (label1->GetPixel(itlabel.GetIndex()) == 0) {// if negative
+          if (negativeCount % strideNegative == 0) {
+            indices.push_back(itlabel.GetIndex());
           }
           negativeCount++;
         }
         else {
-          indices.push_back(it.GetIndex());
+          indices.push_back(itlabel.GetIndex());
         }
       }
-    }
-    else if (isNoMask) { // this part can be removed when ordinal white image will be used as mask
+      class1Count = indices.size() - negativeCount / strideNegative;
+    } else if (isNoMask) { // not take in count 3-class problem
+      // this part can be removed when ordinal white image will be used as mask
       std::cout << "don't mask" << std::endl;
-      itk::ImageRegionConstIterator<BinaryImage3D> it(label, shrinkRegion);
-      for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-        if (label->GetPixel(it.GetIndex()) == 0) {// if negative
-          if (negativeCount % negativeStride == 0) {
-            indices.push_back(it.GetIndex());
+      itk::ImageRegionConstIterator<BinaryImage3D> itLabel(label1, shrinkRegion);
+      for (itLabel.GoToBegin(); !itLabel.IsAtEnd(); ++itLabel) {
+        if (label1->GetPixel(itLabel.GetIndex()) == 0) {// if negative
+          if (negativeCount % strideNegative == 0) {
+            indices.push_back(itLabel.GetIndex());
           }
           negativeCount++;
         }
         else {
-          indices.push_back(it.GetIndex());
+          indices.push_back(itLabel.GetIndex());
         }
       }
+      class1Count = indices.size() - negativeCount / strideNegative;
     } else {
       std::cout << "use mask" << std::endl;
       itk::ImageRegionConstIterator<BinaryImage3D> itMask(mask, shrinkRegion);
 
       for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
         if (itMask.Get() != 0) {
-          if (label->GetPixel(itMask.GetIndex()) == 0) {// if negative
-            if (negativeCount % negativeStride == 0) {
-              indices.push_back(itMask.GetIndex());
+          auto& index = itMask.GetIndex();
+
+          if (label2->GetPixel(index) != 0) {// if 2 class
+            indices.push_back(index);
+            class2Count++;
+          } else if (label1->GetPixel(index) != 0) {// if 1 class
+            indices.push_back(index);
+            class1Count++;
+          } else {
+            if (negativeCount % strideNegative == 0) {
+              indices.push_back(index);
             }
             negativeCount++;
-          }
-          else {
-            indices.push_back(itMask.GetIndex());
           }
         }
       }
     }
     const int totalCount = indices.size();
-    negativeCount /= negativeStride;
+    negativeCount /= strideNegative;
 
-    std::cout << "positiveCount: " << totalCount - negativeCount << std::endl;
+    std::cout << "class1Count: " << class1Count << std::endl;
+    std::cout << "class2Count: " << class2Count << std::endl;
     std::cout << "negativeCount: " << negativeCount << std::endl;
     std::cout << "totalCount: " << totalCount << std::endl;
 
@@ -294,15 +335,18 @@ int main(int argc, char* argv[])
     std::string outDir = outputFolder + "\\" + iImageStr + "\\";
     system((std::string("md ") + outDir).c_str());
 
-    if (is4Classes) {
+    if (isAdaptiveClasses) {
       system((std::string("md ") + outDir + TP).c_str());
       system((std::string("md ") + outDir + TN).c_str());
       system((std::string("md ") + outDir + FP).c_str());
       system((std::string("md ") + outDir + FN).c_str());
     }
-    else { //if 2 classes
-      system((std::string("md ") + outDir + positive).c_str());
-      system((std::string("md ") + outDir + negative).c_str());
+    else { //if 2 or 3 classes
+      system((std::string("md ") + outDir + "0").c_str());
+      system((std::string("md ") + outDir + "1").c_str());
+      if (class2Count != 0) {
+        system((std::string("md ") + outDir + "2").c_str());
+      }
     }
 
     for (int j = 0; j < totalCount; ++j) {
@@ -311,27 +355,30 @@ int main(int argc, char* argv[])
 
       //save image
       std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]) + "_" + std::to_string(index[2]);
-      auto labelI = label->GetPixel(index);
+      auto label1I = label1->GetPixel(index);
       std::string labelStr;
-      if (is4Classes) {
+      // boosted classes
+      if (isAdaptiveClasses) {
         auto adaI = adaptive->GetPixel(index);
-        if (labelI == 1 && adaI == 1) {
+        if (label1I == 1 && adaI == 1) {
           labelStr = TP;
         }
-        else if (labelI == 0 && adaI == 0) {
+        else if (label1I == 0 && adaI == 0) {
           labelStr = TN;
-
         }
-        else if (labelI == 0 && adaI == 1) {
+        else if (label1I == 0 && adaI == 1) {
           labelStr = FP;
-
         }
         else {
           labelStr = FN;
-
         }
-      } else { // 2 classes
-        labelStr = labelI == 0 ? negative : positive;
+      } else { // 2 or 3 classes
+        if (class2Count != 0) { // 3 class
+          auto label2I = label2->GetPixel(index);
+          labelStr = label2I != 0 ? '2' : (label1I != 0 ? '1' : '0');
+        } else {
+          labelStr = label1I != 0 ? '1' : '0';
+        }
       }
       std::string filename = outDir + labelStr + "\\" + indexStr + ext;
 

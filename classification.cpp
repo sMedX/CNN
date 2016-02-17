@@ -88,8 +88,8 @@ int main(int argc, char** argv)
     "output_file =" << output_file << std::endl <<
     "deviceID =" << deviceId << std::endl;
 
-  if (classCount != 2 && classCount != 4) {
-    std::cout << "classCount must be 2 or 4";
+  if (classCount < 1 && classCount > 3) {
+    std::cout << "classCount must be 1, 2, 3 or 4";
   }
 
   std::cout << "load images" << std::endl;
@@ -153,11 +153,19 @@ int main(int argc, char** argv)
   }
   else if (preset == "livertumors") {
     const int shift = 40;
+    agtk::UInt8Image3D::PixelType minValue = 0, maxValue = 255;
 
-    // x'= x + shift
+    // x' = x + shift
     itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
     for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-      it.Set(it.Get() + shift);
+      auto val = it.Get() + shift;
+      if (val < minValue) {
+        val = minValue;
+      }
+      else if (val > maxValue) {
+        val = maxValue;
+      }
+      it.Set(val);
     }
   }
 
