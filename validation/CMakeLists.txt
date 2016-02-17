@@ -10,3 +10,11 @@ set(SOURCES "validation.cpp")
 add_executable(validation ${SOURCES})
 
 TARGET_LINK_LIBRARIES(validation ${LIBRARIES} )
+
+project(moveTumorHack)
+
+set(SOURCES "moveTumorHack.cpp")
+
+add_executable(moveTumorHack ${SOURCES})
+
+TARGET_LINK_LIBRARIES(moveTumorHack ${LIBRARIES} )
