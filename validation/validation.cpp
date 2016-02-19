@@ -22,9 +22,7 @@ void writeReport(std::string& imageFile, std::string& reportFile,
 
   std::string header = dlm;
 
-  int idx1 = imageFile.find_last_of("\\/");
-  int idx2 = imageFile.find_last_of(".");
-  std::string scores = imageFile.substr(idx1 + 1, idx2 - idx1 - 1) + dlm;
+  std::string scores = imageFile + dlm;
 
   header += "ASD, mm" + dlm;
   scores += std::to_string(distBasedMetrics->GetAverageDistance()) + dlm;
