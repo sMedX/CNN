@@ -347,7 +347,7 @@ int main(int argc, char* argv[])
 
     for (int j = 0; j < totalCount; ++j) {
       auto& index = indices[j];
-      auto tile = getTile<UInt8Pixel>(image, index, radius);
+      auto tile = getRGBTile(image, index, radius);
 
       //save image
       std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]) + "_" + std::to_string(index[2]);
