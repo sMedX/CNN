@@ -18,8 +18,8 @@
 #include "agtkBinaryImageUtilities.h"
 #include "agtkResampling.h"
 
-template <typename TPixel>
-agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const typename itk::Image<TPixel, 3>::IndexType& index, int halfSize);
+agtk::BinaryImage2D::Pointer getTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize);
+
 itk::Image<itk::RGBPixel<UINT8>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize);
 
 int main(int argc, char* argv[])
@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
 
   //int c = 0;
 
-  #pragma omp parallel for
+#pragma omp parallel for
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
     auto inputDir = inputDirs[iImage];
     auto imageFile = inputDir + "\\" + imageName;
@@ -196,8 +196,7 @@ int main(int argc, char* argv[])
       for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
         it.Set((it.Get() + shift) / squeeze);
       }
-    }
-    else if (preset == "livertumors") {
+    } else if (preset == "livertumors") {
       const int shift = 40;
 
       // x' = x + shift
@@ -215,8 +214,7 @@ int main(int argc, char* argv[])
       auto val = it.Get();
       if (val < minValue) {
         val = minValue;
-      }
-      else if (val > maxValue) {
+      } else if (val > maxValue) {
         val = maxValue;
       }
       it.Set(val);
@@ -251,7 +249,7 @@ int main(int argc, char* argv[])
     std::cout << "calculate indices" << std::endl;
     std::vector<BinaryImage3D::IndexType> indices;
 
-    const Image3DOffset radius3D = {radius, radius, 0};
+    const Image3DOffset radius3D = { radius, radius, 0 };
 
     //shrink by x and y only
     Image3DIndex movedIndex = image->GetLargestPossibleRegion().GetIndex() + radius3D;
@@ -259,7 +257,7 @@ int main(int argc, char* argv[])
     for (size_t i = 0; i < Image3DRegion::ImageDimension; i++) {
       shrinkedSize[i] = image->GetLargestPossibleRegion().GetSize()[i] - 2 * radius3D[i];
     }
-    Image3DRegion shrinkRegion = {movedIndex, shrinkedSize};
+    Image3DRegion shrinkRegion = { movedIndex, shrinkedSize };
 
     int negativeCount = 0;
     int class1Count = 0;
@@ -278,8 +276,7 @@ int main(int argc, char* argv[])
             indices.push_back(itlabel.GetIndex());
           }
           negativeCount++;
-        }
-        else {
+        } else {
           indices.push_back(itlabel.GetIndex());
         }
       }
@@ -294,8 +291,7 @@ int main(int argc, char* argv[])
             indices.push_back(itLabel.GetIndex());
           }
           negativeCount++;
-        }
-        else {
+        } else {
           indices.push_back(itLabel.GetIndex());
         }
       }
@@ -341,8 +337,7 @@ int main(int argc, char* argv[])
       system((std::string("md ") + outDir + TN).c_str());
       system((std::string("md ") + outDir + FP).c_str());
       system((std::string("md ") + outDir + FN).c_str());
-    }
-    else { //if 2 or 3 classes
+    } else { //if 2 or 3 classes
       system((std::string("md ") + outDir + "0").c_str());
       system((std::string("md ") + outDir + "1").c_str());
       if (class2Count != 0) {
@@ -363,14 +358,11 @@ int main(int argc, char* argv[])
         auto adaI = adaptive->GetPixel(index);
         if (label1I == 1 && adaI == 1) {
           labelStr = TP;
-        }
-        else if (label1I == 0 && adaI == 0) {
+        } else if (label1I == 0 && adaI == 0) {
           labelStr = TN;
-        }
-        else if (label1I == 0 && adaI == 1) {
+        } else if (label1I == 0 && adaI == 1) {
           labelStr = FP;
-        }
-        else {
+        } else {
           labelStr = FN;
         }
       } else { // 2 or 3 classes
@@ -386,34 +378,39 @@ int main(int argc, char* argv[])
       writeImage(tile.GetPointer(), filename);
 
       if (j % 10000 == 0) {
-        std::cout << static_cast<double>(j*100)/totalCount << "% of " << iImageStr << " image" << std::endl;
+        std::cout << static_cast<double>(j * 100) / totalCount << "% of " << iImageStr << " image" << std::endl;
       }
     }
   }
   return EXIT_SUCCESS;
 };
 
-template <typename TPixel>
-agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const typename itk::Image<TPixel, 3>::IndexType& index, int halfSize)
+agtk::BinaryImage2D::Pointer getTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize)
 {
-  typedef itk::Image<TPixel, 3> ImageType3D;
+  typedef agtk::BinaryImage3D ImageType3D;
+  typedef agtk::BinaryImage2D ImageType2D;
 
-  typedef itk::Testing::ExtractSliceImageFilter<ImageType3D, agtk::UInt8Image2D> ExtractVolumeFilterType;
+  agtk::Image2DSize size2D = { 2 * halfSize, 2 * halfSize };
 
-  auto extractVolumeFilter = ExtractVolumeFilterType::New();
+  auto ret = ImageType2D::New();
+  ret->SetRegions(size2D);
+  ret->Allocate();
+
   agtk::Image3DSize size = { 2 * halfSize, 2 * halfSize, 0 };
   agtk::Image3DIndex start = { index[0] - halfSize + 1, index[1] - halfSize + 1, index[2] };
 
-  typename ImageType3D::RegionType outputRegion;
-  outputRegion.SetSize(size);
-  outputRegion.SetIndex(start);
+  agtk::Image3DRegion region;
+  region.SetSize(size);
+  region.SetIndex(start);
 
-  extractVolumeFilter->SetInput(image);
-  extractVolumeFilter->SetExtractionRegion(outputRegion);
-  extractVolumeFilter->SetDirectionCollapseToGuess();
-  extractVolumeFilter->Update();
+  itk::ImageRegionIterator<ImageType2D> itOut(ret, ret->GetLargestPossibleRegion());
+  itk::ImageRegionConstIterator<ImageType3D> itIn(image, region);
 
-  return extractVolumeFilter->GetOutput();
+  for (itOut.GoToBegin(), itIn.GoToBegin(); !itOut.IsAtEnd(); ++itOut, ++itIn) {
+    itOut.Set(itIn.Value());
+  }
+
+  return ret;
 }
 
 itk::Image<itk::RGBPixel<UINT8>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize)
