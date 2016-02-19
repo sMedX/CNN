@@ -20,6 +20,7 @@
 
 template <typename TPixel>
 agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const typename itk::Image<TPixel, 3>::IndexType& index, int halfSize);
+itk::Image<itk::RGBPixel<UINT8>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize);
 
 int main(int argc, char* argv[])
 {
@@ -413,4 +414,50 @@ agtk::UInt8Image2D::Pointer getTile(const itk::Image<TPixel, 3>* image, const ty
   extractVolumeFilter->Update();
 
   return extractVolumeFilter->GetOutput();
+}
+
+itk::Image<itk::RGBPixel<UINT8>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize)
+{
+  typedef agtk::BinaryImage3D ImageType3D;
+  typedef itk::Image<itk::RGBPixel<UINT8>, 2> ImageType2D;
+
+  agtk::Image2DSize size2D = { 2 * halfSize, 2 * halfSize };
+
+  auto ret = ImageType2D::New();
+  ret->SetRegions(size2D);
+  ret->Allocate();
+
+  agtk::Image3DSize size = { 2 * halfSize, 2 * halfSize, 0 };
+  agtk::Image3DIndex start = { index[0] - halfSize + 1, index[1] - halfSize + 1, index[2] };
+  agtk::Image3DIndex startUp = { index[0] - halfSize + 1, index[1] - halfSize + 1, index[2] + 1 };
+  agtk::Image3DIndex startDown = { index[0] - halfSize + 1, index[1] - halfSize + 1, index[2] - 1 };
+
+  agtk::Image3DRegion region;
+  region.SetSize(size);
+  region.SetIndex(start);
+
+  agtk::Image3DRegion regionUp;
+  regionUp.SetSize(size);
+  regionUp.SetIndex(startUp);
+
+  agtk::Image3DRegion regionDown;
+  regionDown.SetSize(size);
+  regionDown.SetIndex(startDown);
+
+  itk::ImageRegionIterator<ImageType2D> itOut(ret, ret->GetLargestPossibleRegion());
+  itk::ImageRegionConstIterator<ImageType3D> itIn(image, region);
+  itk::ImageRegionConstIterator<ImageType3D> itInUp(image, regionUp);
+  itk::ImageRegionConstIterator<ImageType3D> itInDown(image, regionDown);
+
+  for (itOut.GoToBegin(), itIn.GoToBegin(), itInUp.GoToBegin(), itInDown.GoToBegin();
+    !itOut.IsAtEnd();
+    ++itOut, ++itIn, ++itInUp, ++itInDown) {
+    ImageType2D::PixelType val;
+    val[0] = itInDown.Value();
+    val[1] = itIn.Value();
+    val[2] = itInUp.Value();
+    itOut.Set(val);
+  }
+
+  return ret;
 }
