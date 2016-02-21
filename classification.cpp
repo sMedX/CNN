@@ -344,6 +344,12 @@ int main(int argc, char** argv)
           tumCount++;
         }
       }
+      else if (classCount == 3) { // there are background, tumors, singularity in tumors
+        if (max_i != 0) {
+          val = 1;
+          tumCount++;
+        }
+      }
       else {// if classCount == 2
         if (max_i == 1) {
           val = 1;
