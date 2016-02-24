@@ -79,6 +79,9 @@ int main(int argc, char* argv[])
   int strideNegative = 4; // additional stride for negative points
   parser->GetValue("-strideNegative", strideNegative);
 
+  bool isRgb = false;
+  parser->GetValue("-rgb", isRgb);
+
   std::string outputFolder;
   parser->GetValue("-folder", outputFolder);
 
@@ -96,6 +99,7 @@ int main(int argc, char* argv[])
   std::cout << "preset " << preset << std::endl;
   std::cout << "spacingXY " << spacingXY << std::endl;
   std::cout << "stride for negative points is " << strideNegative << std::endl;
+  std::cout << "is Rgb " << isRgb << std::endl;
 
   bool isNoMask = false;
   bool isBoundingBox = false;
@@ -347,7 +351,7 @@ int main(int argc, char* argv[])
 
     for (int j = 0; j < totalCount; ++j) {
       auto& index = indices[j];
-      auto tile = getRGBTile(image, index, radius);
+      auto tile = isRgb ? getRGBTile(image, index, radius) : getTile(image, index, radius);
 
       //save image
       std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]) + "_" + std::to_string(index[2]);
