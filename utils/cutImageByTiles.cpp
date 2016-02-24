@@ -11,6 +11,7 @@
 #include <itkAddImageFilter.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
+#include <itkConstantPadImageFilter.h>
 
 #include "agtkTypes.h"
 #include "agtkIO.h"
@@ -21,6 +22,8 @@
 agtk::BinaryImage2D::Pointer getTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize);
 
 itk::Image<itk::RGBPixel<UINT8>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize);
+
+agtk::BinaryImage3D::Pointer padImage(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::SizeType& outputRegion);
 
 int main(int argc, char* argv[])
 {
@@ -239,7 +242,9 @@ int main(int argc, char* argv[])
 
       image = resampling(image.GetPointer(), spacing);
       label1 = resamplingBinary(label1.GetPointer(), spacing);
-      label2 = resamplingBinary(label2.GetPointer(), spacing);
+      if (label2.IsNotNull()) {
+        label2 = resamplingBinary(label2.GetPointer(), spacing);
+      }
 
       if (mask.IsNotNull()) {
         mask = resamplingBinary(mask.GetPointer(), spacing);
@@ -250,18 +255,28 @@ int main(int argc, char* argv[])
       }
     }
 
+    const Image3DOffset radius3D = { radius, radius, isRgb ? 1 : 0 };
+    const Image3DSize size3D = { radius3D[0], radius3D[1], radius3D[2] };
+    std::cout << "padding by radius " << size3D << std::endl;
+
+    image = padImage(image, size3D);
+    label1 = padImage(label1.GetPointer(), size3D);
+    if (label2.IsNotNull()) {
+      label2 = padImage(label2.GetPointer(), size3D);
+    }
+
+    if (mask.IsNotNull()) {
+      mask = padImage(mask.GetPointer(), size3D);
+    }
+
+    if (isAdaptiveClasses) {
+      adaptive = padImage(adaptive.GetPointer(), size3D);
+    }
+    auto wholeRegion = image->GetLargestPossibleRegion();
+    std::cout << "new region: " << wholeRegion << std::endl;
+
     std::cout << "calculate indices" << std::endl;
     std::vector<BinaryImage3D::IndexType> indices;
-
-    const Image3DOffset radius3D = { radius, radius, 0 };
-
-    //shrink by x and y only
-    Image3DIndex movedIndex = image->GetLargestPossibleRegion().GetIndex() + radius3D;
-    Image3DSize shrinkedSize;
-    for (size_t i = 0; i < Image3DRegion::ImageDimension; i++) {
-      shrinkedSize[i] = image->GetLargestPossibleRegion().GetSize()[i] - 2 * radius3D[i];
-    }
-    Image3DRegion shrinkRegion = { movedIndex, shrinkedSize };
 
     int negativeCount = 0;
     int class1Count = 0;
@@ -269,7 +284,7 @@ int main(int argc, char* argv[])
 
     if (isBoundingBox) { // not take in count 3-class problem
       auto region = getBinaryMaskBoundingBoxRegion(label1);
-      region.Crop(shrinkRegion);
+      region.Crop(wholeRegion);
       std::cout << "use bounding box: " << region << std::endl;
 
       itk::ImageRegionConstIterator<BinaryImage3D> itlabel(label1, region);
@@ -288,7 +303,7 @@ int main(int argc, char* argv[])
     } else if (isNoMask) { // not take in count 3-class problem
       // this part can be removed when ordinal white image will be used as mask
       std::cout << "don't mask" << std::endl;
-      itk::ImageRegionConstIterator<BinaryImage3D> itLabel(label1, shrinkRegion);
+      itk::ImageRegionConstIterator<BinaryImage3D> itLabel(label1, wholeRegion);
       for (itLabel.GoToBegin(); !itLabel.IsAtEnd(); ++itLabel) {
         if (label1->GetPixel(itLabel.GetIndex()) == 0) {// if negative
           if (negativeCount % strideNegative == 0) {
@@ -302,7 +317,7 @@ int main(int argc, char* argv[])
       class1Count = indices.size() - negativeCount / strideNegative;
     } else {
       std::cout << "use mask" << std::endl;
-      itk::ImageRegionConstIterator<BinaryImage3D> itMask(mask, shrinkRegion);
+      itk::ImageRegionConstIterator<BinaryImage3D> itMask(mask, wholeRegion);
 
       for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
         if (itMask.Get() != 0) {
@@ -464,4 +479,20 @@ itk::Image<itk::RGBPixel<UINT8>, 2>::Pointer getRGBTile(const agtk::BinaryImage3
   }
 
   return ret;
+}
+
+agtk::BinaryImage3D::Pointer padImage(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::SizeType& outputRegion)
+{
+  typedef agtk::BinaryImage3D ImageType;
+  typedef itk::ConstantPadImageFilter <ImageType, ImageType> ConstantPadImageFilterType;
+
+  const ImageType::PixelType constantPixel = 0;
+
+  auto padFilter = ConstantPadImageFilterType::New();
+  padFilter->SetInput(image);
+  padFilter->SetPadBound(outputRegion); // Calls SetPadLowerBound(region) and SetPadUpperBound(region)
+  padFilter->SetConstant(constantPixel);
+  padFilter->Update();
+
+  return padFilter->GetOutput();
 }
