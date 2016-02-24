@@ -12,19 +12,10 @@ add_executable(validation ${SOURCES})
 TARGET_LINK_LIBRARIES(validation ${LIBRARIES} )
 
 #
-project(moveTumorHack)
+project(validationRetVOE)
 
-set(SOURCES "moveTumorHack.cpp")
+set(SOURCES "validationRetVOE.cpp")
 
-add_executable(moveTumorHack ${SOURCES})
+add_executable(validationRetVOE ${SOURCES})
 
-TARGET_LINK_LIBRARIES(moveTumorHack ${LIBRARIES} )
-
-#
-project(createRectangleMaskAroundMask)
-
-set(SOURCES "createRectangleMaskAroundMask.cpp")
-
-add_executable(createRectangleMaskAroundMask ${SOURCES})
-
-TARGET_LINK_LIBRARIES(createRectangleMaskAroundMask ${LIBRARIES} )
+TARGET_LINK_LIBRARIES(validationRetVOE ${LIBRARIES} )
