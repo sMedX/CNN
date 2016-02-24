@@ -10,3 +10,21 @@ set(SOURCES "cutImageByTiles.cpp")
 add_executable(cutImageByTiles ${SOURCES})
 
 TARGET_LINK_LIBRARIES(cutImageByTiles ${LIBRARIES} )
+
+#
+project(moveTumorHack)
+
+set(SOURCES "moveTumorHack.cpp")
+
+add_executable(moveTumorHack ${SOURCES})
+
+TARGET_LINK_LIBRARIES(moveTumorHack ${LIBRARIES} )
+
+#
+project(createRectangleMaskAroundMask)
+
+set(SOURCES "createRectangleMaskAroundMask.cpp")
+
+add_executable(createRectangleMaskAroundMask ${SOURCES})
+
+TARGET_LINK_LIBRARIES(createRectangleMaskAroundMask ${LIBRARIES} )

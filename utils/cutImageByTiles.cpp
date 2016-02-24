@@ -351,9 +351,8 @@ int main(int argc, char* argv[])
 
     for (int j = 0; j < totalCount; ++j) {
       auto& index = indices[j];
-      auto tile = isRgb ? getRGBTile(image, index, radius) : getTile(image, index, radius);
 
-      //save image
+      //name image
       std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]) + "_" + std::to_string(index[2]);
       auto label1I = label1->GetPixel(index);
       std::string labelStr;
@@ -379,7 +378,11 @@ int main(int argc, char* argv[])
       }
       std::string filename = outDir + labelStr + "\\" + indexStr + ext;
 
-      writeImage(tile.GetPointer(), filename);
+      if (isRgb) {
+        writeImage(getRGBTile(image, index, radius).GetPointer(), filename);
+      } else {
+        writeImage(getTile(image, index, radius).GetPointer(), filename);
+      }
 
       if (j % 10000 == 0) {
         std::cout << static_cast<double>(j * 100) / totalCount << "% of " << iImageStr << " image" << std::endl;
