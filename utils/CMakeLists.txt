@@ -5,7 +5,7 @@ include_directories(${AGTK_INCLUDE_DIRS})
 list(APPEND LIBRARIES ${AGTK_LIBRARIES})
 
 #
-set(SOURCES "cutImageByTiles.cpp")
+set(SOURCES "cutImageByTiles.cpp" "preprocess.h")
 
 add_executable(cutImageByTiles ${SOURCES})
 
