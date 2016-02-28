@@ -1,4 +1,3 @@
-
 #include <cuda_runtime.h>
 
 #include <cstring>
@@ -72,6 +71,7 @@ int main(int argc, char** argv)
   int groupY = atoi(groupYStr.c_str());
   int classCount = atoi(classCountStr.c_str());
   int deviceId = atoi(deviceIdStr.c_str());
+  bool isRgb = false; //TODO
 
   std::cout << "model_file = " << model_file << std::endl <<
     "trained_file =" << trained_file << std::endl <<
@@ -109,8 +109,7 @@ int main(int argc, char** argv)
   reader->SetFileName(input_file);
   try {
     reader->Update();
-  }
-  catch (itk::ExceptionObject &excp) {
+  } catch (itk::ExceptionObject &excp) {
     std::cout << "Exception thrown while reading the image " << std::endl;
     std::cout << excp << std::endl;
     return EXIT_FAILURE;
@@ -120,14 +119,12 @@ int main(int argc, char** argv)
   agtk::BinaryImage3D::Pointer imageMask;
   if (mask_file == "BOUNDING_BOX") {
     imageMask = nullptr;
-  }
-  else {
+  } else {
     BinaryReaderType::Pointer readerMask = BinaryReaderType::New();
     readerMask->SetFileName(mask_file);
     try {
       readerMask->Update();
-    }
-    catch (itk::ExceptionObject &excp) {
+    } catch (itk::ExceptionObject &excp) {
       std::cout << "Exception thrown while reading the mask " << std::endl;
       std::cout << excp << std::endl;
       return EXIT_FAILURE;
@@ -150,8 +147,7 @@ int main(int argc, char** argv)
     for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
       it.Set((it.Get() + shift) / squeeze);
     }
-  }
-  else if (preset == "livertumors") {
+  } else if (preset == "livertumors") {
     const int shift = 40;
     agtk::UInt8Image3D::PixelType minValue = 0, maxValue = 255;
 
@@ -161,8 +157,7 @@ int main(int argc, char** argv)
       auto val = it.Get() + shift;
       if (val < minValue) {
         val = minValue;
-      }
-      else if (val > maxValue) {
+      } else if (val > maxValue) {
         val = maxValue;
       }
       it.Set(val);
@@ -201,7 +196,12 @@ int main(int argc, char** argv)
   std::cout << "Calculating indices" << std::endl;
 
   auto shrinkRegion = image->GetLargestPossibleRegion();
-  const agtk::Image3DSize radius3D = {radiusXY, radiusXY, 0};
+  agtk::Image3DSize radius3D;
+  if (isRgb) {
+    radius3D = { radiusXY, radiusXY, 0 };
+  } else {
+    radius3D = { radiusXY, radiusXY, 1 };
+  }
   shrinkRegion.ShrinkByRadius(radius3D);
   region.Crop(shrinkRegion);
 
@@ -220,8 +220,7 @@ int main(int argc, char** argv)
         }
       }
     }
-  }
-  else {
+  } else {
     std::cout << "not use mask" << std::endl;
     itk::ImageRegionConstIterator<agtk::FloatImage3D> itMask(image, region);
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
@@ -259,18 +258,23 @@ int main(int argc, char** argv)
   Caffe::set_mode(Caffe::GPU);
   Caffe::SetDevice(deviceId);
 
-  //get the net
+  std::cout << "create net" << std::endl;
   Net<float> caffe_test_net(model_file, TEST);
-  //get trained net
+
+  std::cout << "load net's weights" << std::endl;
   caffe_test_net.CopyTrainedLayersFrom(trained_file);
 
   float* buffer = image->GetBufferPointer();
 
-  const int channels = 1;
+  int channels = isRgb ? 3 : 1;
+
+  std::cout << "isRgb: " << isRgb << std::endl;
+  std::cout << "channels: " << channels << std::endl;
+
   // tile's properties
   const int height = 2 * radiusXY;
   const int width = 2 * radiusXY;
-  const int tileSize = width*height;
+  const int tileSize = width*height*channels;
   const int lineSizeInBytes = 2 * radiusXY*sizeof(float);
 
   // image's properties
@@ -284,7 +288,7 @@ int main(int argc, char** argv)
     auto time0 = clock();
     std::cout << i << "th batch" << std::endl;
 
-    Blob<float>* blob = new Blob<float>(batchLength, channels, height, width); // has been moved out from the loop
+    Blob<float>* blob = new Blob<float>(batchLength, channels, height, width);
 
     //int lastX = -1; // we dont use last z and assume thay 'z' stay same
     for (int iTile = 0; iTile < batchLength; ++iTile) {
@@ -293,19 +297,35 @@ int main(int argc, char** argv)
       //concat new line(s) to last tile
       //} else {
       //make tile from the scratch
-      const int zOffset = index[2] * sliceSize;
       const int xOffset = (index[0] - radiusXY + 1);
       const int yOffsetPart = (index[1] - radiusXY + 1)* lineSize;
-      float* src = buffer + zOffset + yOffsetPart + xOffset;
 
-      const int tileOffset = iTile*tileSize;
+      const int tileOffset = iTile*tileSize; // todo remove these line dst buffer is adjusted by +=
       float* dst = blob->mutable_cpu_data() + tileOffset;
 
-      for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
-        memcpy(dst, src, lineSizeInBytes);
+      if (isRgb) {
+        for (int j = -1; j < 2; j++) { // -1, 0, 1
+          const int zOffset = (index[2] + j) * sliceSize;
+          const float* src = buffer + zOffset + yOffsetPart + xOffset;
 
-        src += lineSize; // adjust yOffset
-        dst += width; // adjust lineOffset
+          for (int iRow = 0; iRow < 2 * radiusXY; iRow++) {
+            memcpy(dst, src, lineSizeInBytes);
+
+            src += lineSize; // adjust yOffset
+            dst += width; // adjust lineOffset
+          }
+        }
+
+      } else {
+        const int zOffset = index[2] * sliceSize;
+        const float* src = buffer + zOffset + yOffsetPart + xOffset;
+
+        for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
+          memcpy(dst, src, lineSizeInBytes);
+
+          src += lineSize; // adjust yOffset
+          dst += width; // adjust lineOffset
+        }
       }
     }
 
@@ -343,14 +363,12 @@ int main(int argc, char** argv)
           val = 1;
           tumCount++;
         }
-      }
-      else if (classCount == 3) { // there are background, tumors, singularity in tumors
+      } else if (classCount == 3) { // there are background, tumors, singularity in tumors
         if (max_i != 0) {
           val = 1;
           tumCount++;
         }
-      }
-      else {// if classCount == 2
+      } else {// if classCount == 2
         if (max_i == 1) {
           val = 1;
           tumCount++;
@@ -359,7 +377,7 @@ int main(int argc, char** argv)
       //set group's area
       for (int k = -groupX / 2; k < groupX - groupX / 2; ++k) {
         for (int l = -groupY / 2; l < groupY - groupY / 2; ++l) {
-          agtk::Image3DSize offset = {k, l, 0};
+          agtk::Image3DSize offset = { k, l, 0 };
           auto index2 = index + offset;
           outImage->SetPixel(index2, val); // can be improved if only group 1x1 used
         }
@@ -384,8 +402,7 @@ int main(int argc, char** argv)
   writer->SetInput(outImage);
   try {
     writer->Update();
-  }
-  catch (itk::ExceptionObject &excp) {
+  } catch (itk::ExceptionObject &excp) {
     std::cout << "Exception thrown while writing " << std::endl;
     std::cout << excp << std::endl;
     return EXIT_FAILURE;
