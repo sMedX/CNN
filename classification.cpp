@@ -13,14 +13,17 @@
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 
-#include "C:/alex/agtk/Modules/Core/agtkResampling.h" //todo remove it or intergrate agtk
-
 #include "caffe/caffe.hpp"
 #include "caffe/blob.hpp"
+
+#include "agtkResampling.h"
+
+#include "preprocess.h"
 
 int main(int argc, char** argv)
 {
   using namespace caffe;
+  using namespace agtk;
 
   string model_file = argv[1];
   string trained_file = argv[2];
@@ -50,17 +53,17 @@ int main(int argc, char** argv)
 
   string deviceIdStr = argv[19];
 
-  agtk::Image3DIndex start;
+  Image3DIndex start;
   start[0] = atoi(start_x_str.c_str());
   start[1] = atoi(start_y_str.c_str());
   start[2] = atoi(start_z_str.c_str());
 
-  agtk::Image3DSize size;
+  Image3DSize size;
   size[0] = atoi(size_x_str.c_str());
   size[1] = atoi(size_y_str.c_str());
   size[2] = atoi(size_z_str.c_str());
 
-  agtk::Image3DRegion region;
+  Image3DRegion region;
   region.SetIndex(start);
   region.SetSize(size);
 
@@ -102,8 +105,8 @@ int main(int argc, char** argv)
   RegisteredObjectsContainerType registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
   std::cout << "there are " << registeredIOs.size() << " IO objects available to the ImageFileReader." << std::endl;
 
-  typedef itk::ImageFileReader<agtk::Int16Image3D> ReaderType;
-  typedef itk::ImageFileReader<agtk::BinaryImage3D> BinaryReaderType;
+  typedef itk::ImageFileReader<Int16Image3D> ReaderType;
+  typedef itk::ImageFileReader<BinaryImage3D> BinaryReaderType;
 
   ReaderType::Pointer reader = ReaderType::New();
   reader->SetFileName(input_file);
@@ -116,7 +119,7 @@ int main(int argc, char** argv)
   }
   std::cout << "." << std::endl;
 
-  agtk::BinaryImage3D::Pointer imageMask;
+  BinaryImage3D::Pointer imageMask;
   if (mask_file == "BOUNDING_BOX") {
     imageMask = nullptr;
   } else {
@@ -133,70 +136,31 @@ int main(int argc, char** argv)
   }
   std::cout << "." << std::endl;
 
-  agtk::Int16Image3D::Pointer image16 = reader->GetOutput();
+  Int16Image3D::Pointer image16 = reader->GetOutput();
 
-  std::cout << "preprocess images" << std::endl;
-  std::cout << "shift, scale images" << std::endl;
+  UInt8Image3D::Pointer image8 = UInt8Image3D::New();
+  UInt8Image3D::Pointer imageNull = nullptr;
 
-  if (preset == "pancreas") {
-    const int shift = 190;// b
-    const int squeeze = 2;// a
-
-    // x' = (x + b)/a
-    itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
-    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-      it.Set((it.Get() + shift) / squeeze);
-    }
-  } else if (preset == "livertumors") {
-    const int shift = 40;
-    agtk::UInt8Image3D::PixelType minValue = 0, maxValue = 255;
-
-    // x' = x + shift
-    itk::ImageRegionIterator<agtk::Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
-    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-      auto val = it.Get() + shift;
-      if (val < minValue) {
-        val = minValue;
-      } else if (val > maxValue) {
-        val = maxValue;
-      }
-      it.Set(val);
-    }
-  }
-
-  if (spacingXY != 0) {
-    std::cout << "resample image's axial slices" << std::endl;
-
-    agtk::Image3DSpacing spacing;
-    spacing[0] = spacingXY;
-    spacing[1] = spacingXY;
-    spacing[2] = image16->GetSpacing()[2];
-
-    image16 = agtk::resampling(image16.GetPointer(), spacing);
-
-    if (imageMask != nullptr) {
-      imageMask = agtk::resamplingBinary(imageMask.GetPointer(), spacing);
-    }
-  }
+  preprocess(radiusXY, preset, spacingXY, isRgb, image16, imageNull, imageNull, imageMask, imageNull, image8);
+  image16 = nullptr;
 
   std::cout << "cast image to float" << std::endl;
-  typedef itk::CastImageFilter<agtk::Int16Image3D, agtk::FloatImage3D> Cast;
+  typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
   auto cast = Cast::New();
-  cast->SetInput(image16);
+  cast->SetInput(image8);
   cast->Update();
-  agtk::FloatImage3D::Pointer image = cast->GetOutput();
+  FloatImage3D::Pointer image = cast->GetOutput();
   if (imageMask != nullptr) {
     if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
       std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
       return EXIT_FAILURE;
     }
   }
-  image16 = nullptr;
 
   std::cout << "Calculating indices" << std::endl;
 
   auto shrinkRegion = image->GetLargestPossibleRegion();
-  agtk::Image3DSize radius3D;
+  Image3DSize radius3D;
   if (isRgb) {
     radius3D = { radiusXY, radiusXY, 0 };
   } else {
@@ -205,11 +169,11 @@ int main(int argc, char** argv)
   shrinkRegion.ShrinkByRadius(radius3D);
   region.Crop(shrinkRegion);
 
-  vector<agtk::Image3DIndex> indices;
+  vector<Image3DIndex> indices;
   std::cout << "region: " << region << std::endl;
   if (imageMask.IsNotNull()) {
     std::cout << "use mask" << std::endl;
-    itk::ImageRegionConstIterator<agtk::BinaryImage3D> itMask(imageMask, region);
+    itk::ImageRegionConstIterator<BinaryImage3D> itMask(imageMask, region);
 
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
       if (itMask.Get() != 0) {
@@ -222,7 +186,7 @@ int main(int argc, char** argv)
     }
   } else {
     std::cout << "not use mask" << std::endl;
-    itk::ImageRegionConstIterator<agtk::FloatImage3D> itMask(image, region);
+    itk::ImageRegionConstIterator<FloatImage3D> itMask(image, region);
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
       //take central pixel of group
       auto& index = itMask.GetIndex();
@@ -241,7 +205,7 @@ int main(int argc, char** argv)
 
   std::cout << "total count:" << totalCount << std::endl;
 
-  agtk::BinaryImage3D::Pointer outImage = agtk::BinaryImage3D::New();
+  BinaryImage3D::Pointer outImage = BinaryImage3D::New();
   outImage->CopyInformation(image);
   outImage->SetRegions(image->GetLargestPossibleRegion());
   outImage->Allocate();
@@ -377,7 +341,7 @@ int main(int argc, char** argv)
       //set group's area
       for (int k = -groupX / 2; k < groupX - groupX / 2; ++k) {
         for (int l = -groupY / 2; l < groupY - groupY / 2; ++l) {
-          agtk::Image3DSize offset = { k, l, 0 };
+          Image3DSize offset = { k, l, 0 };
           auto index2 = index + offset;
           outImage->SetPixel(index2, val); // can be improved if only group 1x1 used
         }
@@ -396,7 +360,7 @@ int main(int argc, char** argv)
 
   std::cout << "tumors - " << tumCount << "\n";
 
-  typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
+  typedef itk::ImageFileWriter<BinaryImage3D>  writerType;
   writerType::Pointer writer = writerType::New();
   writer->SetFileName(output_file);
   writer->SetInput(outImage);

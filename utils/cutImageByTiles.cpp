@@ -189,7 +189,7 @@ int main(int argc, char* argv[])
 
     std::cout << "preprocess images" << std::endl;
     UInt8Image3D::Pointer image;
-    preprocess(radius, preset, spacingXY, isRgb, image16, label1, label2, mask, adaptive, isAdaptiveClasses, image);
+    preprocess(radius, preset, spacingXY[0], isRgb, image16, label1, label2, mask, adaptive, image);
     auto wholeRegion = image->GetLargestPossibleRegion();
     std::cout << "new region: " << wholeRegion << std::endl;
 
