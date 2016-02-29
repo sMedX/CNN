@@ -41,8 +41,8 @@ def main(pathIn, pathOut, k, n):
     print 'testDirs', testDirs
     print 'trainDirs', trainDirs
     
-    sampleTestf = open(os.path.join(pathOut, 'sampleList-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
-    sampleTrainf = open(os.path.join(pathOut, 'sampleList-train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    sampleTestf = open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    sampleTrainf = open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     for dir in testDirs:
         print >>sampleTestf, os.path.join(pathIn,dir)
     for dir in trainDirs:
@@ -81,8 +81,8 @@ def main(pathIn, pathOut, k, n):
     pos = random.sample(posList, posCount + testCount)
     neg = random.sample(negList, negCount + testCount)
     
-    testf = open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
-    trainf = open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    testf = open(os.path.join(pathOut, 'tileList-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    trainf = open(os.path.join(pathOut, 'tileList-train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     
     it = iter(neg[ : testCount])
     for posfile in pos[ : testCount]:

@@ -42,8 +42,8 @@ def main(pathIn, pathOut, k, n):
     print 'testDirs', testDirs
     print 'trainDirs', trainDirs
     
-    sampleTestf = open(os.path.join(pathOut, 'sampleList-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
-    sampleTrainf = open(os.path.join(pathOut, 'sampleList-train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    sampleTestf = open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    sampleTrainf = open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     for dir in testDirs:
         print >>sampleTestf, os.pathIn.join(pathIn,dir)
     for dir in trainDirs:
@@ -72,8 +72,8 @@ def main(pathIn, pathOut, k, n):
         if count < minCount:
             minCount = count;        
 
-    testf = open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
-    trainf = open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    testf = open(os.path.join(pathOut, 'tileList-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    trainf = open(os.path.join(pathOut, 'tileList-train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     
     for file0 in classes[0].fileList[ : testCount]:
         print >>testf, file0 + ' 0'        
