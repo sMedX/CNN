@@ -60,13 +60,12 @@ def main():
         tileTrainListK = os.path.join(dir, 'train-cv-' + kn + '.txt')
         tileTestListK = os.path.join(dir, 'test-cv-' + kn + '.txt')
 
-        createSolver(iters, k, n, snapshotFolder)
-        createNet(kn, tileTestListK, tileTrainListK)
+        solver = createNetAndSolver(kn, tileTestListK, tileTrainListK,iters, snapshotFolder)
 
-        subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, str(k), str(n)])
+        if (k!=0):
+            subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, str(k), str(n)])
 
         train = 'C:\\caffe\\bin\\caffe_cc35.exe'
-        solver = 'solver-cv-' + kn + '.prototxt'
         subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId])
 
         deploy = os.path.join('C:\\caffe', preset, ver, 'deploy.prototxt')
@@ -86,8 +85,8 @@ def main():
                 preset, '0' if spacing=='orig' else spacing, batchLength, groupX, groupY, classCount, os.path.join(line, patient),
                 os.path.join(line, mask), os.path.join(line, outputCNN), deviceId]
                 print args
-                subprocess.call(args
-                    )
+                if (k!=0):
+                    subprocess.call(args)
 
         validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)          
 
@@ -116,33 +115,30 @@ def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
     return valid
 
 
-def createSolver(iters, k, n, snapshotFolder):
-    solverTemplate = os.path.join(dir, 'solverTemplate.prototxt')
-    solver = os.path.join(dir, 'solver-cv-' + str(k) + '-' + str(n) + '.prototxt')
-    fileData = None
-    with open(solverTemplate, 'r') as file:
-        fileData = file.read()
-    fileData = fileData \
-        .replace('%k%', str(k)) \
-        .replace('%n%', str(n)) \
-        .replace('%iters%', iters) \
-        .replace('%snapshotFolder%', snapshotFolder.replace('\\','/')+'/')
-    with open(solver, 'w') as file:
-        file.write(fileData)
-
-
-def createNet(kn, tileTestListK, tileTrainListK):
+def createNetAndSolver(kn, tileTestListK, tileTrainListK, iters, snapshotFolder):
     netTemplate = os.path.join(dir, 'netTemplate.prototxt')
     net = os.path.join(dir, 'net-cv-' + kn + '.prototxt')
     fileData = None
     with open(netTemplate, 'r') as file:
         fileData = file.read()
     fileData = fileData \
-        .replace('%trainTilesList%', tileTrainListK) \
-        .replace('%testTilesList%', tileTestListK)
+        .replace('%trainTilesList%', tileTrainListK.replace('\\','/')) \
+        .replace('%testTilesList%', tileTestListK.replace('\\','/'))
     with open(net, 'w') as file:
         file.write(fileData)
-
+        
+    solverTemplate = os.path.join(dir, 'solverTemplate.prototxt')
+    solver = os.path.join(dir, 'solver-cv-' + kn + '.prototxt')
+    fileData = None
+    with open(solverTemplate, 'r') as file:
+        fileData = file.read()
+    fileData = fileData \
+        .replace('%net%', net.replace('\\','/')) \
+        .replace('%iters%', iters) \
+        .replace('%snapshotFolder%', snapshotFolder.replace('\\','/')+'/')
+    with open(solver, 'w') as file:
+        file.write(fileData)
+    return solver
 
 if __name__ == "__main__":
     main()
