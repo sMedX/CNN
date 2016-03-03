@@ -28,3 +28,9 @@ set(SOURCES "createRectangleMaskAroundMask.cpp")
 add_executable(createRectangleMaskAroundMask ${SOURCES})
 
 TARGET_LINK_LIBRARIES(createRectangleMaskAroundMask ${LIBRARIES} )
+#
+set(SOURCES "cutImageBySlices.cpp" "preprocess.h")
+
+add_executable(cutImageBySlices ${SOURCES})
+
+TARGET_LINK_LIBRARIES(cutImageBySlices ${LIBRARIES} )
