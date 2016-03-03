@@ -16,9 +16,26 @@
 #include "caffe/caffe.hpp"
 #include "caffe/blob.hpp"
 
+#define NO_VTK
 #include "agtkResampling.h"
 
 #include "preprocess.h"
+
+bool writeImage(const std::string& outputFile, const BinaryImage3D::Pointer& outImage)
+{
+  typedef itk::ImageFileWriter<BinaryImage3D>  writerType;
+  writerType::Pointer writer = writerType::New();
+  writer->SetFileName(outputFile);
+  writer->SetInput(outImage);
+  try {
+    writer->Update();
+  } catch (itk::ExceptionObject &excp) {
+    std::cout << "Exception thrown while writing " << std::endl;
+    std::cout << excp << std::endl;
+    return false;
+  }
+  return true;
+}
 
 int main(int argc, char** argv)
 {
@@ -49,7 +66,7 @@ int main(int argc, char** argv)
 
   string input_file = argv[16];
   string mask_file = argv[17];
-  string output_file = argv[18];
+  string outputFile = argv[18];
 
   string deviceIdStr = argv[19];
 
@@ -88,7 +105,7 @@ int main(int argc, char** argv)
     "classCount=" << classCount << std::endl <<
     "input_file = " << input_file << std::endl <<
     "mask_file =" << mask_file << std::endl <<
-    "output_file =" << output_file << std::endl <<
+    "output_file =" << outputFile << std::endl <<
     "deviceID =" << deviceId << std::endl;
 
   if (classCount < 1 && classCount > 3) {
@@ -138,11 +155,13 @@ int main(int argc, char** argv)
 
   Int16Image3D::Pointer image16 = reader->GetOutput();
 
+  auto initialSpacing = image16->GetSpacing();
+
   UInt8Image3D::Pointer image8 = UInt8Image3D::New();
   UInt8Image3D::Pointer imageNull = nullptr;
 
   preprocess(radiusXY, preset, spacingXY, isRgb, image16, imageNull, imageNull, imageMask, imageNull, image8);
-  image16 = nullptr;
+
 
   std::cout << "cast image to float" << std::endl;
   typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
@@ -214,7 +233,7 @@ int main(int argc, char** argv)
   std::cout << "." << std::endl;
 
   int itCount = 0;
-  int tumCount = 0;
+  int posCount = 0;
 
   std::cout << "Applying CNN in deploy config" << std::endl;
 
@@ -261,8 +280,8 @@ int main(int argc, char** argv)
       //concat new line(s) to last tile
       //} else {
       //make tile from the scratch
-      const int xOffset = (index[0] - radiusXY + 1);
-      const int yOffsetPart = (index[1] - radiusXY + 1)* lineSize;
+      const int xOffset = (index[0]/* - radiusXY*/ + 1); //TODO mb adjust index of image?
+      const int yOffsetPart = (index[1]/* - radiusXY*/ + 1)* lineSize;
 
       const int tileOffset = iTile*tileSize; // todo remove these line dst buffer is adjusted by +=
       float* dst = blob->mutable_cpu_data() + tileOffset;
@@ -325,17 +344,17 @@ int main(int argc, char** argv)
 
         if (max_i == TP || max_i == FN) { // TP,FN -> true, TN,FP ->false
           val = 1;
-          tumCount++;
+          posCount++;
         }
       } else if (classCount == 3) { // there are background, tumors, singularity in tumors
         if (max_i != 0) {
           val = 1;
-          tumCount++;
+          posCount++;
         }
       } else {// if classCount == 2
         if (max_i == 1) {
           val = 1;
-          tumCount++;
+          posCount++;
         }
       }
       //set group's area
@@ -358,17 +377,19 @@ int main(int argc, char** argv)
 
   }
 
-  std::cout << "tumors - " << tumCount << "\n";
+  std::cout << "positives:" << posCount << std::endl;
+ 
+  writeImage(outputFile + "_pp.nrrd", outImage);
 
-  typedef itk::ImageFileWriter<BinaryImage3D>  writerType;
-  writerType::Pointer writer = writerType::New();
-  writer->SetFileName(output_file);
-  writer->SetInput(outImage);
-  try {
-    writer->Update();
-  } catch (itk::ExceptionObject &excp) {
-    std::cout << "Exception thrown while writing " << std::endl;
-    std::cout << excp << std::endl;
+  //postprocess
+  //resampling back
+  if (spacingXY != 0) { //resample image by axial slices
+    std::cout << "resample" << std::endl;
+    outImage = resamplingLike(outImage.GetPointer(), image16.GetPointer());
+  }
+
+  std::cout << "save" << std::endl;
+  if (!writeImage(outputFile, outImage)) {
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
