@@ -8,21 +8,23 @@ import glob
 
 
 class ClassData:
-    def __init__(self, pathIn, fileList, testIter, trainIter):
-        self.pathIn = pathIn
+    def __init__(self, pathTiles, fileList, testIter, trainIter):
+        self.pathTiles = pathTiles
         self.fileList = fileList
         self.testIter = testIter
         self.trainIter = trainIter
 
-def main(pathIn, pathOut, k, n):
+def main(pathTiles, pathOut, pathImages, k, n):
     if (k >= n):
         print 'error. k must be less than n'
         return
     
     classCount = 3
+    preset = pathOut.replace('\\', '/').split('/')[-2]
+    print 'preset: ', preset
 
     #make n parts
-    allDirs=os.listdir(pathIn)
+    allDirs=os.listdir(pathTiles)
     dirsInPart = int(len(allDirs) / n)
     parts = []
     for i in range(0,n):
@@ -45,28 +47,28 @@ def main(pathIn, pathOut, k, n):
     sampleTestf = open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     sampleTrainf = open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     for dir in testDirs:
-        print >>sampleTestf, os.pathIn.join(pathIn,dir)
+        print >>sampleTestf, os.path.join(pathImages, preset, dir)
     for dir in trainDirs:
-        print >>sampleTrainf, os.pathIn.join(pathIn,dir)
+        print >>sampleTrainf, os.path.join(pathImages, preset, dir)
         
     classes = [];
 
     minCount = 10000000
     testCount = 5000
     for iClass in range(0,classCount):
-        pathInI = os.pathIn.join(pathIn, '*', str(iClass), '*.png')
+        pathTilesI = os.path.join(pathTiles, '*', str(iClass), '*.png')
         
         print 'class:', str(iClass)
-        print 'pathIn:', pathInI
+        print 'pathTiles:', pathTilesI
         
-        #fileList = [file for file in glob.glob(pathInI) if any(name in file for name in trainDirs)] #filter for
-        fileList = glob.glob(pathInI)
+        #fileList = [file for file in glob.glob(pathTilesI) if any(name in file for name in trainDirs)] #filter for
+        fileList = glob.glob(pathTilesI)
         
         print 'filelist count:', str(len(fileList))
         
         count = len(fileList)
         fileList = random.sample(fileList, count)
-        classData = ClassData(pathInI, fileList, iter(fileList[ : testCount]), iter(fileList[testCount : ]))
+        classData = ClassData(pathTilesI, fileList, iter(fileList[ : testCount]), iter(fileList[testCount : ]))
         classes.append(classData)
         
         if count < minCount:
@@ -82,7 +84,7 @@ def main(pathIn, pathOut, k, n):
             fileI = next(classes[i].testIter, None)    
             if fileI != None:
                 print >>testf, fileI + ' ' + str(i)
-                #print >>trainf, classes[i].pathIn + '/' + fileI + ' ' + str(i)
+                #print >>trainf, classes[i].pathTiles + '/' + fileI + ' ' + str(i)
 
     #trainCount = minCount
     trainCount = 2000000
@@ -115,17 +117,19 @@ if __name__ == "__main__":
     print 'Number of arguments:', len(sys.argv), 'arguments.'
     print 'Argument List:', str(sys.argv)
     
-    pathIn = sys.argv[1]
+    pathTiles = sys.argv[1]
     pathOut = sys.argv[2]
+    pathImages = sys.argv[3]
         
-    print 'pathIn:', pathIn
+    print 'pathTiles:', pathTiles
     print 'pathOut:', pathOut
+    print 'pathImages:', pathImages
     
-    if (len(sys.argv)>4):
-        k = int(sys.argv[3])
-        n = int(sys.argv[4])
+    if (len(sys.argv)>5):
+        k = int(sys.argv[4])
+        n = int(sys.argv[5])
     else:
         k=0
         n=1
         
-    main(pathIn, pathOut, k, n)
+    main(pathTiles, pathOut, pathImages, k, n)

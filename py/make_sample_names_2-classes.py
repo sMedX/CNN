@@ -1,11 +1,11 @@
-from __future__ import division
+#from __future__ import division
 
 import os 
 import itertools
 import sys
 import random
 
-def main(pathIn, pathOut, k, n):
+def main(pathTiles, pathOut, pathImages, k, n):
     ###
     #numbers present for each class
     itemCount = 2000000 # all sample count. i.e. pos + negPosRate*neg
@@ -13,15 +13,19 @@ def main(pathIn, pathOut, k, n):
     negPosRate = 3 # n negative for each positive sample
     classCount = 2 #0 and 1
     ###
+    
     if (k >= n):
         print 'error. k must be less than n'
         return
+
+    preset = pathOut.replace('\\', '/').split('/')[-2]
+    print 'preset: ', preset
     
     testCount = int(itemCount * testTrainRate/classCount)
     print 'testCount:'+str(testCount)
     
     #make n parts
-    allDirs=os.listdir(pathIn)
+    allDirs=os.listdir(pathTiles)
     dirsInPart = int(len(allDirs) / n)
     parts = []
     for i in range(0,n):
@@ -44,26 +48,26 @@ def main(pathIn, pathOut, k, n):
     sampleTestf = open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     sampleTrainf = open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     for dir in testDirs:
-        print >>sampleTestf, os.path.join(pathIn,dir)
+        print >>sampleTestf, os.path.join(pathImages, preset, dir)
     for dir in trainDirs:
-        print >>sampleTrainf, os.path.join(pathIn,dir)
+        print >>sampleTrainf, os.path.join(pathImages, preset, dir)
     
-    negpathInes = []
-    pospathInes = []
+    negpathTileses = []
+    pospathTileses = []
     
     for sample in trainDirs:
-        negpathInes.append(os.path.join(pathIn,sample,'0'))
-        pospathInes.append(os.path.join(pathIn,sample,'1'))
+        negpathTileses.append(os.path.join(pathTiles,sample,'0'))
+        pospathTileses.append(os.path.join(pathTiles,sample,'1'))
     
     posList = []
     negList = []
     
-    for pathIn in pospathInes:
-        for file in os.listdir(pathIn):
-            posList.append(os.path.join(pathIn,file))
-    for pathIn in negpathInes:
-        for file in os.listdir(pathIn):
-            negList.append(os.path.join(pathIn,file))
+    for pathTiles in pospathTileses:
+        for file in os.listdir(pathTiles):
+            posList.append(os.path.join(pathTiles,file))
+    for pathTiles in negpathTileses:
+        for file in os.listdir(pathTiles):
+            negList.append(os.path.join(pathTiles,file))
      
     print posList[0]
     posCount = len(posList)
@@ -102,19 +106,19 @@ if __name__ == "__main__":
     print 'Number of arguments:', len(sys.argv), 'arguments.'
     print 'Argument List:', str(sys.argv)
     
-    pathIn = sys.argv[1]
+    pathTiles = sys.argv[1]
     pathOut = sys.argv[2]
+    pathImages = sys.argv[3]
+        
+    print 'pathTiles:', pathTiles
+    print 'pathOut:', pathOut
+    print 'pathImages:', pathImages
     
-    if (len(sys.argv)>4):
-        k = int(sys.argv[3])
-        n = int(sys.argv[4])
+    if (len(sys.argv)>5):
+        k = int(sys.argv[4])
+        n = int(sys.argv[5])
     else:
         k=0
         n=1
         
-    print 'pathIn:', pathIn
-    print 'pathOut:', pathOut
-    print 'k:', k
-    print 'n:', n
-    
-    main(pathIn, pathOut, k, n)
+    main(pathTiles, pathOut, pathImages, k, n)
