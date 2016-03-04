@@ -1,8 +1,8 @@
 cmake_minimum_required (VERSION 2.8.11)
 project(cutImageByTiles)
 
-include_directories(${AGTK_INCLUDE_DIRS})
-list(APPEND LIBRARIES ${AGTK_LIBRARIES})
+include_directories(${INCLUDE_DIRS})
+list(APPEND LIBRARIES ${LIBRARIES})
 
 #
 set(SOURCES "cutImageByTiles.cpp" "preprocess.h")
