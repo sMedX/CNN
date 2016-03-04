@@ -34,7 +34,7 @@ find_package(Caffe)
 include_directories(${Caffe_INCLUDE_DIRS})
 add_definitions(${Caffe_DEFINITIONS})    # ex. -DCPU_ONLY
 
-set() ${Caffe_LIBRARIES})
+list(APPEND LIBRARIES ${Caffe_LIBRARIES})
 
 #
 message(STATUS "INCLUDE_DIRS")
