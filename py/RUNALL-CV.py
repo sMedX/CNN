@@ -6,13 +6,15 @@ import errno
 classCount = '2'
 cut = 'D:\\alex\\CNN-build\\utils\\Release\\CutImageByTiles.exe'
 makeTileLists = ['python.exe', 'make_sample_names_' + classCount + '-classes.py']
+train = 'C:\\caffe\\bin\\caffe_cc35.exe'
 clas = 'D:\\alex\\nets_pancreas\\caffe-win-1029\\bin\\class_new.exe'
 postproc = 'D:\\alex\\CNN-build\\postprocessing\\Release\\postprocessing.exe'
 valid = 'D:\\alex\\CNN-build\\validation\\Release\\Validation.exe'
 
-preset = 'livertumors'
-ver = '25'
-spacing = '0.782'
+preset = 'pancreas'
+ver = '6__'
+spacing = '0'
+spacingStr = 'orig' if spacing=='0' else spacing
 
 deviceId = '1'
 iters = '150000'
@@ -23,11 +25,11 @@ print dir
 r = '32'
 size = int(r) * 2
 label = preset + '.nrrd'
-mask = 'liver.nrrd'
+mask = 'pancreas.nrrd-boundingRec-r5.nrrd'
 patient = 'patient.nrrd'
   
 imagesPath = 'D:\\alex\\images'
-tilesFolder = os.path.join('D:\\alex\\tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacing)
+tilesFolder = os.path.join('D:\\alex\\tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr)
 samplesList = os.path.join(imagesPath, preset, 'samplesList.txt')
 
 deploy = os.path.join('C:\\caffe', preset, ver, 'deploy.prototxt')
@@ -39,8 +41,7 @@ groupX = '3'
 groupY = '3'
 print preset,',v-', ver, ',spacing-', spacing
 
-snapshotFolder = os.path.join('D:\\Artem\\caffe\\snap', preset, ver)
-
+snaphotPrefix='D:\\Artem\\caffe\\snap'
 sigma = '4.000000'
 
 def main():
@@ -53,18 +54,21 @@ def main():
     #    print 'error. ', cut, ' exit with ', retcode
     #    return
   
-    # create folder for snapshots
-    try:
-        os.makedirs(snapshotFolder)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise e
-        pass
 
     n = 4  # number of parts for cross-validation
 
     for k in range(0, n):
+
         kn = str(k) + '-' + str(n)
+        # create folder for snapshots
+        snapshotFolder = os.path.join(snaphotPrefix, preset, ver, kn)
+        try:
+            os.makedirs(snapshotFolder)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise e
+            pass
+        #
         sampleTrainListK = os.path.join(dir, 'train-cv-' + kn + '.txt')
         sampleTestListK = os.path.join(dir, 'test-cv-' + kn + '.txt')
 
@@ -72,10 +76,8 @@ def main():
         tileTestListK = os.path.join(dir, 'tileList-test-cv-' + kn + '.txt')
 
         solver = createNetAndSolver(kn, tileTestListK, tileTrainListK,iters, snapshotFolder)
-        if (k!=0):###
-            subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, imagesPath, str(k), str(n)])
+        subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, imagesPath, str(k), str(n)])
 
-        train = 'C:\\caffe\\bin\\caffe_cc35.exe'
         subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId])
 
         suffix = '-v' + ver + '-g' + groupX + 'x' + groupY + '-c' + classCount + '-s' + spacing + '-cv' + kn + '.nrrd'
@@ -85,7 +87,7 @@ def main():
             for line in f:
                 line=line.replace('\n','')
                 args=[clas, deploy, model, str(start[0]), str(start[1]), str(start[2]), str(size[0]), str(size[1]), str(size[2]), r,
-                preset, '0' if spacing=='orig' else spacing, batchLength, groupX, groupY, classCount, os.path.join(line, patient),
+                preset, spacing, batchLength, groupX, groupY, classCount, os.path.join(line, patient),
                 os.path.join(line, mask), os.path.join(line, outputCNN), deviceId]
                 print args
                 subprocess.call(args)
@@ -95,8 +97,7 @@ def main():
         with open(samplesList) as f:
             for line in f:
                 line = line.replace('\n','')
-                if (k!=0):
-                    subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma])
+                subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma])
 
         suffix = suffix + '-gaussian' + sigma + '.nrrd'
         outputCNN = preset + '-cnn-' + suffix
