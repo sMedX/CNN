@@ -80,8 +80,8 @@ def main():
 
         subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId])
 
-        suffix = '-v' + ver + '-g' + groupX + 'x' + groupY + '-c' + classCount + '-s' + spacing + '-cv' + kn + '.nrrd'
-        outputCNN = preset + '-cnn-' + suffix
+        suffix = '-v' + ver + '-g' + groupX + 'x' + groupY + '-c' + classCount + '-s' + spacing
+        outputCNN = preset + '-cnn' + suffix + '-cv' + nk + '.nrrd'
 
         with open(samplesList) as f:
             for line in f:
@@ -94,13 +94,14 @@ def main():
 
         validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)          
 
+        suffix = suffix + '-gaussian' + sigma
+        outputCNN = preset + '-cnn' + suffix + '.nrrd'
+
         with open(samplesList) as f:
             for line in f:
                 line = line.replace('\n','')
                 subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma])
 
-        suffix = suffix + '-gaussian' + sigma + '.nrrd'
-        outputCNN = preset + '-cnn-' + suffix
         validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)
     return
 
