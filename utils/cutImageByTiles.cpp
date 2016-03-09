@@ -14,7 +14,6 @@
 #include "agtkTypes.h"
 #include "agtkIO.h"
 #include "agtkCommandLineArgumentParser.h"
-#include "agtkBinaryImageUtilities.h"
 
 #include "preprocess.h"
 
@@ -27,7 +26,6 @@ int main(int argc, char* argv[])
   using namespace agtk;
 
   const std::string ext = ".png";
-  const std::string BOUNDING_BOX = "BOUNDING_BOX";
   const std::string NO_MASK = "NO_MASK";
 
   const std::string TP = "TP", TN = "TN", FP = "FP", FN = "FN"; //for 4classes
@@ -102,11 +100,8 @@ int main(int argc, char* argv[])
   std::cout << "is Rgb " << isRgb << std::endl;
 
   bool isNoMask = false;
-  bool isBoundingBox = false;
   if (maskName == NO_MASK) {
     isNoMask = true;
-  } else if (maskName == BOUNDING_BOX) {
-    isBoundingBox = true;
   }
   std::vector<std::string> inputDirs;
 
@@ -164,7 +159,7 @@ int main(int argc, char* argv[])
       }
     }
     BinaryImage3D::Pointer mask = BinaryImage3D::New();
-    if (!(isBoundingBox || isNoMask)) {
+    if (!isNoMask) {
       std::cout << "load mask" << std::endl;
       auto maskFile = inputDir + "\\" + maskName;
       std::cout << "maskFile " << maskFile << std::endl;
@@ -200,25 +195,7 @@ int main(int argc, char* argv[])
     int class1Count = 0;
     int class2Count = 0;
 
-    if (isBoundingBox) { // not take in count 3-class problem
-      auto region = getBinaryMaskBoundingBoxRegion(label1);
-      region.Crop(wholeRegion);
-      std::cout << "use bounding box: " << region << std::endl;
-
-      itk::ImageRegionConstIterator<BinaryImage3D> itlabel(label1, region);
-
-      for (itlabel.GoToBegin(); !itlabel.IsAtEnd(); ++itlabel) {
-        if (label1->GetPixel(itlabel.GetIndex()) == 0) {// if negative
-          if (negativeCount % strideNegative == 0) {
-            indices.push_back(itlabel.GetIndex());
-          }
-          negativeCount++;
-        } else {
-          indices.push_back(itlabel.GetIndex());
-        }
-      }
-      class1Count = indices.size() - negativeCount / strideNegative;
-    } else if (isNoMask) { // not take in count 3-class problem
+    if (isNoMask) { // not take in count 3-class problem
       // this part can be removed when ordinal white image will be used as mask
       std::cout << "don't mask" << std::endl;
       itk::ImageRegionConstIterator<BinaryImage3D> itLabel(label1, wholeRegion);
