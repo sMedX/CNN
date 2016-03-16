@@ -11,13 +11,13 @@ clas = 'D:\\alex\\nets_pancreas\\caffe-win-1029\\bin\\class_new.exe'
 postproc = 'D:\\alex\\CNN-build\\postprocessing\\Release\\postprocessing.exe'
 valid = 'D:\\alex\\CNN-build\\validation\\Release\\Validation.exe'
 
-preset = 'pancreas'
-ver = '6__'
-spacing = '0'
+preset = 'livertumors'
+ver = '25'
+spacing = '0.782'
 spacingStr = 'orig' if spacing=='0' else spacing
 
 deviceId = '1'
-iters = '150000'
+iters = '30000'
 
 dir=os.path.join('C:/caffe', preset, ver)
 print dir
@@ -25,15 +25,14 @@ print dir
 r = '32'
 size = int(r) * 2
 label = preset + '.nrrd'
-mask = 'pancreas.nrrd-boundingRec-r5.nrrd'
+mask = 'liver.nrrd'
 patient = 'patient.nrrd'
   
 imagesPath = 'D:\\alex\\images'
 tilesFolder = os.path.join('D:\\alex\\tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr)
-samplesList = os.path.join(imagesPath, preset, 'samplesList.txt')
+samplesList = os.path.join(imagesPath, preset, 'samplesListGood.txt')
 
 deploy = os.path.join('C:\\caffe', preset, ver, 'deploy.prototxt')
-model = os.path.join('D:/artem/caffe/snap', preset, ver, '_iter_' + iters + '.caffemodel')
 start = [0, 0, 0]
 size = [512, 512, 1000]
 batchLength = '1024'
@@ -47,18 +46,16 @@ sigma = '4.000000'
 def main():
 
     #retcode = subprocess.call([cut, '-listFile', samplesList, '-imageName', patient, '-labelName1', label,
-    #                 '-labelName2', 'livertumors.nrrd', '-maskName', mask, '-radius', str(r), '-preset', preset,
+    #                 '-labelName2', 'livertumors_dark.nrrd', '-maskName', mask, '-radius', r, '-preset', preset,
     #                 '-stride 0 0 0', '-spacingXY', spacing, spacing, '-strideNegative 1', '-folder', tilesFolder])
-    
+    #
     #if (retcode != 0):
     #    print 'error. ', cut, ' exit with ', retcode
     #    return
-  
 
     n = 4  # number of parts for cross-validation
 
     for k in range(0, n):
-
         kn = str(k) + '-' + str(n)
         # create folder for snapshots
         snapshotFolder = os.path.join(snaphotPrefix, preset, ver, kn)
@@ -68,20 +65,28 @@ def main():
             if e.errno != errno.EEXIST:
                 raise e
             pass
-        #
+                
+        model = os.path.join(snapshotFolder, '_iter_' + iters + '.caffemodel')
+
+        # make lists
+        retcode = subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, imagesPath, samplesList, str(k), str(n)])
+        if retcode!=0:
+            print 'error. ', cut, ' exit with ', retcode
+            return
+            
         sampleTrainListK = os.path.join(dir, 'train-cv-' + kn + '.txt')
         sampleTestListK = os.path.join(dir, 'test-cv-' + kn + '.txt')
 
         tileTrainListK = os.path.join(dir, 'tileList-train-cv-' + kn + '.txt')
         tileTestListK = os.path.join(dir, 'tileList-test-cv-' + kn + '.txt')
 
-        solver = createNetAndSolver(kn, tileTestListK, tileTrainListK,iters, snapshotFolder)
-        subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, imagesPath, str(k), str(n)])
-
+        # make net and solver
+        solver = createNetAndSolver(kn, tileTestListK, tileTrainListK, iters, snapshotFolder)
+        
         subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId])
 
-        suffix = '-v' + ver + '-g' + groupX + 'x' + groupY + '-c' + classCount + '-s' + spacing
-        outputCNN = preset + '-cnn' + suffix + '-cv' + nk + '.nrrd'
+        suffix = '-v' + ver + '-g' + groupX + 'x' + groupY + '-c' + classCount + '-s' + spacing + '-cv' + kn + '.nrrd'
+        outputCNN = preset + '-cnn' + suffix
 
         with open(samplesList) as f:
             for line in f:
@@ -91,16 +96,16 @@ def main():
                 os.path.join(line, mask), os.path.join(line, outputCNN), deviceId]
                 print args
                 subprocess.call(args)
-
-        validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)          
-
-        suffix = suffix + '-gaussian' + sigma
-        outputCNN = preset + '-cnn' + suffix + '.nrrd'
+        
+        #validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)          
 
         with open(samplesList) as f:
             for line in f:
                 line = line.replace('\n','')
                 subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma])
+        
+        suffix = suffix + '-gaussian' + sigma + '.nrrd'
+        outputCNN = preset + '-cnn' + suffix
 
         validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)
     return

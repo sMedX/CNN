@@ -5,10 +5,10 @@ import itertools
 import sys
 import random
 
-def main(pathTiles, pathOut, pathImages, k, n):
+def main(pathTiles, pathOut, pathImages, samplesListFile, k, n):
     ###
     #numbers present for each class
-    itemCount = 2000000 # all sample count. i.e. pos + negPosRate*neg
+    itemCount = 500000 # all sample count. i.e. pos + negPosRate*neg
     testTrainRate = 0.1
     negPosRate = 3 # n negative for each positive sample
     classCount = 2 #0 and 1
@@ -16,7 +16,7 @@ def main(pathTiles, pathOut, pathImages, k, n):
     
     if (k >= n):
         print 'error. k must be less than n'
-        return
+        return False
 
     preset = pathOut.replace('\\', '/').split('/')[-2]
     print 'preset: ', preset
@@ -25,15 +25,26 @@ def main(pathTiles, pathOut, pathImages, k, n):
     print 'testCount:'+str(testCount)
     
     #make n parts
-    allDirs=os.listdir(pathTiles)
-    dirsInPart = int(len(allDirs) / n)
+    requestedSamples = []
+    with open(samplesListFile) as f:
+        for line in f:
+            line=line.replace('\n','').replace('\\','/').split('/')[-1]
+            requestedSamples.append(line)
+    print 'requestedSamples:', requestedSamples
+    
+    print 'existing dirs:', os.listdir(pathTiles) 
+    if (any([dir not in os.listdir(pathTiles) for dir in requestedSamples])):
+        print 'at least one of requested samples epsent in tile folder'
+        return False
+   
+    dirsInPart = int(len(requestedSamples) / n)
     parts = []
     for i in range(0,n):
         if (i!=n-1):
-            partI = allDirs[i*dirsInPart:(i+1)*dirsInPart]
+            partI = requestedSamples[i*dirsInPart:(i+1)*dirsInPart]
             parts.append(partI)
         else: # rest elements goes to the last part
-            partI = allDirs[i*dirsInPart:]
+            partI = requestedSamples[i*dirsInPart:]
             parts.append(partI)
     print 'parts:', parts
     
@@ -100,7 +111,7 @@ def main(pathTiles, pathOut, pathImages, k, n):
         for i in range(negPosRate):
             negfile = next(it)    
             print >>trainf, negfile + ' 0'         
-    return
+    return True
 
 if __name__ == "__main__":
     print 'Number of arguments:', len(sys.argv), 'arguments.'
@@ -109,16 +120,20 @@ if __name__ == "__main__":
     pathTiles = sys.argv[1]
     pathOut = sys.argv[2]
     pathImages = sys.argv[3]
-        
+    samplesListFile = sys.argv[4]
+    
     print 'pathTiles:', pathTiles
     print 'pathOut:', pathOut
     print 'pathImages:', pathImages
+    print 'samplesListFile:', samplesListFile
     
-    if (len(sys.argv)>5):
-        k = int(sys.argv[4])
-        n = int(sys.argv[5])
+    if (len(sys.argv)>6):
+        k = int(sys.argv[5])
+        n = int(sys.argv[6])
     else:
         k=0
         n=1
         
-    main(pathTiles, pathOut, pathImages, k, n)
+    success = main(pathTiles, pathOut, pathImages,samplesListFile, k, n)
+    if not success:
+        sys.exit(1)

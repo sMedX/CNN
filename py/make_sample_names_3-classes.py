@@ -1,4 +1,4 @@
-#from __future__ import division
+#TODO need update like 2-class version
 
 import os 
 import itertools
