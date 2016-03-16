@@ -21,9 +21,9 @@
 
 #include "preprocess.h"
 
-bool writeImage(const std::string& outputFile, const BinaryImage3D::Pointer& outImage)
+bool writeImage(const std::string& outputFile, const agtk::BinaryImage3D::Pointer& outImage)
 {
-  typedef itk::ImageFileWriter<BinaryImage3D>  writerType;
+  typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
   writerType::Pointer writer = writerType::New();
   writer->SetFileName(outputFile);
   writer->SetInput(outImage);
@@ -39,6 +39,7 @@ bool writeImage(const std::string& outputFile, const BinaryImage3D::Pointer& out
 
 int main(int argc, char** argv)
 {
+  using namespace std;
   using namespace caffe;
   using namespace agtk;
 
@@ -155,13 +156,12 @@ int main(int argc, char** argv)
 
   Int16Image3D::Pointer image16 = reader->GetOutput();
 
-  auto initialSpacing = image16->GetSpacing();
+  //auto initialSpacing = image16->GetSpacing(); //todo remove
 
   UInt8Image3D::Pointer image8 = UInt8Image3D::New();
   UInt8Image3D::Pointer imageNull = nullptr;
 
   preprocess(radiusXY, preset, spacingXY, isRgb, image16, imageNull, imageNull, imageMask, imageNull, image8);
-
 
   std::cout << "cast image to float" << std::endl;
   typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
@@ -379,7 +379,7 @@ int main(int argc, char** argv)
 
   std::cout << "positives:" << posCount << std::endl;
  
-  writeImage(outputFile + "_pp.nrrd", outImage);
+  //writeImage(outputFile + "_pp.nrrd", outImage); image before postprocessing
 
   //postprocess
   //resampling back

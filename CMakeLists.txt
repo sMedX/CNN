@@ -7,18 +7,21 @@ project(for-caffe)
 # ITK
 find_package(ITK 4.7 REQUIRED)
 include(${ITK_USE_FILE})
+list(APPEND LIBRARIES ${ITK_LIBRARIES})
 
 # ------------------------------------------------------------------------------
 # AGTK
 # ------------------------------------------------------------------------------
-#find_package(AGTK)
-#include(${AGTK_USE_FILE})
-set(AGTK_DIR  CACHE PATH "AGTK sources ")
+find_package(AGTK)
+include(${AGTK_USE_FILE})
+list(APPEND LIBRARIES ${AGTK_LIBRARIES})
 
-message(STATUS "AGTK_DIR")
-message(STATUS ${AGTK_DIR})
+#set(AGTK_DIR  CACHE PATH "AGTK sources ")
 
-set(INCLUDE_DIRS "${AGTK_DIR}/Modules/Core")
+#message(STATUS "AGTK_DIR")
+#message(STATUS ${AGTK_DIR})
+
+#set(INCLUDE_DIRS "${AGTK_DIR}/Modules/Core")
 
 # ------------------------------------------------------------------------------
 # CUDA
@@ -30,18 +33,16 @@ find_package(CUDA REQUIRED)
 # ------------------------------------------------------------------------------
 # caffe
 # ------------------------------------------------------------------------------
-find_package(Caffe)
-include_directories(${Caffe_INCLUDE_DIRS})
-add_definitions(${Caffe_DEFINITIONS})    # ex. -DCPU_ONLY
+#find_package(Caffe)
+#include_directories(${Caffe_INCLUDE_DIRS})
+#add_definitions(${Caffe_DEFINITIONS})    # ex. -DCPU_ONLY
 
-list(APPEND LIBRARIES ${Caffe_LIBRARIES})
+#list(APPEND LIBRARIES ${Caffe_LIBRARIES})
 
 #
-message(STATUS "INCLUDE_DIRS")
-message(STATUS ${INCLUDE_DIRS})
+message(STATUS "INCLUDE_DIRS ${INCLUDE_DIRS}")
 
-message(STATUS "LIBRARIES")
-message(STATUS ${LIBRARIES})
+message(STATUS "LIBRARIES ${LIBRARIES}")
 
 add_subdirectory(validation)
 add_subdirectory(postprocessing)
@@ -49,7 +50,6 @@ add_subdirectory(utils)
 
 #
 include_directories(${INCLUDE_DIRS})
-list(APPEND LIBRARIES ${LIBRARIES})
 
 set(SOURCES "classification.cpp")
 

@@ -157,7 +157,10 @@ int main(int argc, char* argv[])
         label2->Allocate();
         label2->FillBuffer(0);
       }
+    } else {
+      label2 = nullptr;
     }
+
     BinaryImage3D::Pointer mask = BinaryImage3D::New();
     if (!isNoMask) {
       std::cout << "load mask" << std::endl;
@@ -167,6 +170,8 @@ int main(int argc, char* argv[])
         std::cout << "can't read " << maskFile << std::endl;
         continue;
       }
+    } else {
+      mask = nullptr;
     }
 
     BinaryImage3D::Pointer adaptive = BinaryImage3D::New();
@@ -178,6 +183,8 @@ int main(int argc, char* argv[])
         std::cout << "can't read " << adaptiveFile << std::endl;
         continue;
       }
+    } else {
+      adaptive = nullptr;
     }
 
     //todo add check for equal size
