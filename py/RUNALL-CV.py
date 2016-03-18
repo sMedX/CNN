@@ -17,7 +17,7 @@ spacing = '0.782'
 spacingStr = 'orig' if spacing=='0' else spacing
 
 deviceId = '1'
-iters = '30000'
+iters = '250000'
 
 dir=os.path.join('C:/caffe', preset, ver)
 print dir
@@ -78,12 +78,14 @@ def main():
         sampleTestListK = os.path.join(dir, 'test-cv-' + kn + '.txt')
 
         tileTrainListK = os.path.join(dir, 'tileList-train-cv-' + kn + '.txt')
-        tileTestListK = os.path.join(dir, 'tileList-test-cv-' + kn + '.txt')
+        tileTrainTestListK = os.path.join(dir, 'tileList-train-test-cv-' + kn + '.txt')
+        tileTestTest5050ListK = os.path.join(dir, 'tileList-test-test-50-50-cv-' + kn + '.txt')
+        tileTestTestListK = os.path.join(dir, 'tileList-test-test-cv-' + kn + '.txt')
 
         # make net and solver
-        solver = createNetAndSolver(kn, tileTestListK, tileTrainListK, iters, snapshotFolder)
+        solver = createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTest5050ListK, tileTestTestListK, iters, snapshotFolder)
         
-        subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId])
+        subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId], stdout = open('log'+kn+'.txt', 'w')) #not work on windows
 
         suffix = '-v' + ver + '-g' + groupX + 'x' + groupY + '-c' + classCount + '-s' + spacing + '-cv' + kn + '.nrrd'
         outputCNN = preset + '-cnn' + suffix
@@ -125,7 +127,7 @@ def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
     return valid
 
 
-def createNetAndSolver(kn, tileTestListK, tileTrainListK, iters, snapshotFolder):
+def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTest5050ListK, tileTestTestListK, iters, snapshotFolder):
     netTemplate = os.path.join(dir, 'netTemplate.prototxt')
     net = os.path.join(dir, 'net-cv-' + kn + '.prototxt')
     fileData = None
@@ -133,7 +135,10 @@ def createNetAndSolver(kn, tileTestListK, tileTrainListK, iters, snapshotFolder)
         fileData = file.read()
     fileData = fileData \
         .replace('%trainTilesList%', tileTrainListK.replace('\\','/')) \
-        .replace('%testTilesList%', tileTestListK.replace('\\','/'))
+        .replace('%trainTestTilesList%', tileTrainTestListK.replace('\\','/')) \
+        .replace('%testTest50-50TilesList%', tileTestTest5050ListK.replace('\\','/')) \
+        .replace('%testTestTilesList%', tileTestTestListK.replace('\\','/'))
+
     with open(net, 'w') as file:
         file.write(fileData)
     print 'net ' + net + ' has been created'
