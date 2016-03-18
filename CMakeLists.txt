@@ -4,24 +4,53 @@ project(for-caffe)
 # ------------------------------------------------------------------------------
 # Dependencies
 # ------------------------------------------------------------------------------
+# Find Boost
+#set(Boost_USE_STATIC_LIBS ON)
+#set(Boost_USE_MULTITHREADED ON)
+find_package(Boost REQUIRED COMPONENTS filesystem)
+include_directories(${Boost_INCLUDE_DIRS})
+list(APPEND LIBRARIES ${Boost_LIBRARIES})
+
+if( WIN32 )
+  # disable autolinking in boost
+  add_definitions(-DBOOST_ALL_NO_LIB)
+endif()
+
 # ITK
 find_package(ITK 4.7 REQUIRED)
 include(${ITK_USE_FILE})
 list(APPEND LIBRARIES ${ITK_LIBRARIES})
 
+# Find OpenCV
+find_package(OpenCV 2.4.11 REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+list(APPEND LIBRARIES ${OpenCV_LIBRARIES})
+
 # ------------------------------------------------------------------------------
 # AGTK
 # ------------------------------------------------------------------------------
-find_package(AGTK)
-include(${AGTK_USE_FILE})
-list(APPEND LIBRARIES ${AGTK_LIBRARIES})
+option(USE_EXTERNAL_AGTK "Use full AGTK" OFF)
 
-#set(AGTK_DIR  CACHE PATH "AGTK sources ")
+if (USE_EXTERNAL_AGTK)
+    find_package(AGTK)
+    include(${AGTK_USE_FILE})
 
-#message(STATUS "AGTK_DIR")
-#message(STATUS ${AGTK_DIR})
+    include_directories(${AGTK_INCLUDE_DIRS})
+    
+    list(APPEND LIBRARIES ${AGTK_LIBRARIES})
+else()
+    include(mini-agtk/CMake/agtkFunctions.cmake)
+    
+    set(AGTK_Core mini-agtk/Modules/Core)
+    set(AGTK_ImageMetrics mini-agtk/Modules/ImageMetrics)
+    #${} 
+    add_subdirectory(${AGTK_Core})
+    add_subdirectory(${AGTK_ImageMetrics})
+    
+    #list(APPEND INCLUDE_DIRS ${AGTK_Core} ${AGTK_ImageMetrics})
+    include_directories(${AGTK_Core} ${AGTK_ImageMetrics})
+endif()
 
-#set(INCLUDE_DIRS "${AGTK_DIR}/Modules/Core")
 
 # ------------------------------------------------------------------------------
 # CUDA
