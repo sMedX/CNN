@@ -1,5 +1,6 @@
 #include <itkConstantPadImageFilter.h>
 
+#include "agtkAdaptiveHistogramEqualizationImageFilter.h"
 #include "agtkResampling.h"
 
 namespace
@@ -23,7 +24,7 @@ namespace
   }
 
   // Performs preprocessing with casting to uint8
-  UInt8Image3D::Pointer smartCastImage(std::string& preset, Int16Image3D::Pointer& image16)
+  UInt8Image3D::Pointer smartCastImage(std::string& preset, Int16Image3D::Pointer& image16, BinaryImage3D::Pointer& mask)
   {
     std::cout << "shift, sqeeze" << std::endl;
 
@@ -37,13 +38,32 @@ namespace
         it.Set((it.Get() + shift) / squeeze);
       }
     } else if (preset == "livertumors") {
-      const int shift = 40;
+      //const int shift = 40;
 
-      // x' = x + shift
-      itk::ImageRegionIterator<Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
-      for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-        it.Set(it.Get() + shift);
-      }
+      //// x' = x + shift
+      //itk::ImageRegionIterator<Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
+      //for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+      //  it.Set(it.Get() + shift);
+      //}
+      int radius = 5;
+      float alpha = 0.3;
+      float beta = 0.3;
+      int lut = 0;
+      float outsideValue = 0;
+
+      std::vector<float> range = { 0, 255 };
+      typedef agtk::AdaptiveHistogramEqualizationImageFilter <Int16Image3D> AdaptiveHistogramEqualizationImageFilterType;
+      AdaptiveHistogramEqualizationImageFilterType::Pointer equalize = AdaptiveHistogramEqualizationImageFilterType::New();
+      equalize->SetRadius(radius);
+      equalize->SetAlpha(alpha);
+      equalize->SetBeta(beta);
+      equalize->SetOutsideValue(outsideValue);
+      equalize->SetUseLookupTable(lut);
+      equalize->SetShiftDynamicRange(range[0], range[1]);
+      equalize->SetMask(mask);
+      equalize->SetInput(image16);
+      equalize->Update();
+      equalize->Print(std::cout);
     }
     std::cout << "cast (truncate)" << std::endl;
     // force integer overflow
@@ -72,7 +92,7 @@ namespace
     UInt8Image3D::Pointer& IN OUT label1, UInt8Image3D::Pointer&IN OUT label2, UInt8Image3D::Pointer& IN OUT mask, UInt8Image3D::Pointer& IN OUT adaptive,
     UInt8Image3D::Pointer& OUT image)
   {
-    image = smartCastImage(preset, image16);
+    image = smartCastImage(preset, image16, mask);
 
     if (spacingXY != 0) { //resample image by axial slices
       std::cout << "resample" << std::endl;
