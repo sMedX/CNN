@@ -43,6 +43,9 @@ print preset,',v-', ver, ',spacing-', spacing
 snaphotPrefix='D:\\Artem\\caffe\\snap'
 sigma = '4.000000'
 
+
+n = 4  # number of parts for cross-validation
+
 def main():
 
     #retcode = subprocess.call([cut, '-listFile', samplesList, '-imageName', patient, '-labelName1', label,
@@ -53,9 +56,13 @@ def main():
     #    print 'error. ', cut, ' exit with ', retcode
     #    return
 
-    n = 4  # number of parts for cross-validation
-
-    for k in range(0, n):
+    # make lists
+    retcode = subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, imagesPath, samplesList, str(n)])
+    if retcode!=0:
+        print 'error. ', cut, ' exit with ', retcode
+        return
+        
+    for k in range(2, n):
         kn = str(k) + '-' + str(n)
         # create folder for snapshots
         snapshotFolder = os.path.join(snaphotPrefix, preset, ver, kn)
@@ -68,12 +75,7 @@ def main():
                 
         model = os.path.join(snapshotFolder, '_iter_' + iters + '.caffemodel')
 
-        # make lists
-        retcode = subprocess.call([makeTileLists[0], makeTileLists[1], tilesFolder, dir, imagesPath, samplesList, str(k), str(n)])
-        if retcode!=0:
-            print 'error. ', cut, ' exit with ', retcode
-            return
-            
+    
         sampleTrainListK = os.path.join(dir, 'train-cv-' + kn + '.txt')
         sampleTestListK = os.path.join(dir, 'test-cv-' + kn + '.txt')
 

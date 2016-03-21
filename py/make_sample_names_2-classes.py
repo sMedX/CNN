@@ -5,7 +5,7 @@ import itertools
 import sys
 import random
 
-def main(pathTiles, pathOut, pathImages, samplesListFile, k, n):
+def main(pathTiles, pathOut, pathImages, samplesListFile, n):
     ###
     #numbers present for each class
     testTrainRate = 0.1
@@ -13,10 +13,6 @@ def main(pathTiles, pathOut, pathImages, samplesListFile, k, n):
     classCount = 2 #0 and 1
     ###
     
-    if (k >= n):
-        print 'error. k must be less than n'
-        return False
-
     preset = pathOut.replace('\\', '/').split('/')[-2]
     print 'preset: ', preset
     
@@ -45,115 +41,112 @@ def main(pathTiles, pathOut, pathImages, samplesListFile, k, n):
             parts.append(partI)
     print 'parts:', parts
     
-    testDirs=parts[k]
-    trainDirs=[]
-    for i in range(0,n):
-        if (i!=k):
-            trainDirs.extend(parts[i])
-    print 'testDirs', testDirs
-    print 'trainDirs', trainDirs
-    
-    with open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as sampleTestf:
-        for dir in testDirs:
-            print >>sampleTestf, os.path.join(pathImages, preset, dir)
-    with open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as sampleTrainf:
-        for dir in trainDirs:
-            print >>sampleTrainf, os.path.join(pathImages, preset, dir)
-    
-    negPathTiles = []
-    posPathTiles = []
-    
-    for sample in trainDirs:
-        negPathTiles.append(os.path.join(pathTiles,sample,'0'))
-        posPathTiles.append(os.path.join(pathTiles,sample,'1'))
-    
-    posList = []
-    negList = []
-    
-    for path in posPathTiles:
-        for file in os.listdir(path):
-            posList.append(os.path.join(path,file))
-    for path in negPathTiles:
-        for file in os.listdir(path):
-            negList.append(os.path.join(path,file))
+    for k in range(2, n):
+        print '====================================='
+        print 'part #', k
+        testDirs=parts[k]
+        trainDirs=[]
+        for i in range(0,n):
+            if (i!=k):
+                trainDirs.extend(parts[i])
+        print 'testDirs', testDirs
+        print 'trainDirs', trainDirs
+        
+        with open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as sampleTestf:
+            for dir in testDirs:
+                print >>sampleTestf, os.path.join(pathImages, preset, dir)
+        with open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as sampleTrainf:
+            for dir in trainDirs:
+                print >>sampleTrainf, os.path.join(pathImages, preset, dir)
+        
+        negPathTiles = []
+        posPathTiles = []
+        
+        for sample in trainDirs:
+            negPathTiles.append(os.path.join(pathTiles,sample,'0'))
+            posPathTiles.append(os.path.join(pathTiles,sample,'1'))
+        
+        posList = []
+        negList = []
+        
+        for path in posPathTiles:
+            for file in os.listdir(path):
+                posList.append(os.path.join(path,file))
+        for path in negPathTiles:
+            for file in os.listdir(path):
+                negList.append(os.path.join(path,file))
 
-    posCount = len(posList)
-    negCount = len(negList)
-    allCount = posCount + negCount
-    
-    print 'all:'+str(allCount)
-    print 'all pos:'+str(posCount)
-    print 'all neg:'+str(negCount)
+        posCount = len(posList)
+        negCount = len(negList)
+        allCount = posCount + negCount
+        
+        print 'all:'+str(allCount)
+        print 'all pos:'+str(posCount)
+        print 'all neg:'+str(negCount)
 
-    posCount = min([int(allCount * 1 / (negPosRate + 1)), posCount])
-    negCount = min([int(allCount*negPosRate / (negPosRate + 1)), negCount])
-    
-    print 'used pos:'+str(posCount)
-    print 'used neg:'+str(negCount)
+        posCount = min([int(allCount * 1 / (negPosRate + 1)), posCount])
+        negCount = min([int(allCount*negPosRate / (negPosRate + 1)), negCount])
+        
+        print 'used pos:'+str(posCount)
+        print 'used neg:'+str(negCount)
 
-    pos = random.sample(posList, posCount)
-    neg = random.sample(negList, negCount)
-   
-    testCount = int(allCount * testTrainRate/classCount)
-    print 'testCount:'+str(testCount)
+        pos = random.sample(posList, posCount)
+        neg = random.sample(negList, negCount)
+       
+        testCount = int(allCount * testTrainRate/classCount)
+        print 'testCount:'+str(testCount)
+        
+        if pos < testCount or neg < testCount:
+            print 'to few elements. Count must be at least more than testCount'
+            continue
 
-    #test on train
-    with open(os.path.join(pathOut, 'tileList-train-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as testf:    
-        it = iter(neg[ : testCount])
-        for posfile in pos[ : testCount]:
-            negfile = next(it)    
-            print >>testf, posfile + ' 1'        
-            print >>testf, negfile + ' 0'
-    #train
-    with open(os.path.join(pathOut, 'tileList-train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as trainf:
-        it = iter(neg[testCount :])
-        for posfile in pos[testCount :]:
-            print >>trainf, posfile + ' 1'
-            for i in range(negPosRate):
+        kn=str(k)+'-'+str(n)
+        #test on train
+        with open(os.path.join(pathOut, 'tileList-train-test-cv-'+kn+'.txt'), 'w') as testf:    
+            it = iter(neg[ : testCount])
+            for posfile in pos[ : testCount]:
                 negfile = next(it)    
-                print >>trainf, negfile + ' 0'
-    #test on test
-    print 'test: '+str(testCount*classCount)
-    negPathTiles = []
-    posPathTiles = []
-    
-    for sample in testDirs:
-        negPathTiles.append(os.path.join(pathTiles,sample,'0'))
-        posPathTiles.append(os.path.join(pathTiles,sample,'1'))
-    
-    posList = []
-    negList = []
-    
-    for path in posPathTiles:
-        for file in os.listdir(path):
-            posList.append(os.path.join(path,file))
-    for path in negPathTiles:
-        for file in os.listdir(path):
-            negList.append(os.path.join(path,file))
+                print >>testf, posfile + ' 1'        
+                print >>testf, negfile + ' 0'
+        #train
+        with open(os.path.join(pathOut, 'tileList-train-cv-'+kn+'.txt'), 'w') as trainf:
+            it = iter(neg[testCount :])
+            for posfile in pos[testCount :]:
+                print >>trainf, posfile + ' 1'
+                for i in range(negPosRate):
+                    negfile = next(it)    
+                    print >>trainf, negfile + ' 0'
+        #test on test
+        print 'test: '+str(testCount*classCount)
+        negPathTiles = []
+        posPathTiles = []
+        
+        for sample in testDirs:
+            negPathTiles.append(os.path.join(pathTiles,sample,'0'))
+            posPathTiles.append(os.path.join(pathTiles,sample,'1'))
+        
+        posList = []
+        negList = []
+        
+        for path in posPathTiles:
+            for file in os.listdir(path):
+                posList.append(os.path.join(path,file))
+        for path in negPathTiles:
+            for file in os.listdir(path):
+                negList.append(os.path.join(path,file))
 
-    pos = random.sample(posList, min([testCount, len(posList)])) 
-    neg = random.sample(negList, min([testCount, len(negList)]))
-    
-    print 'used test pos: ' + str(len(pos))
-    print 'used test neg: ' + str(len(neg))
-    
-    with open(os.path.join(pathOut, 'tileList-test-test-50-50-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as testf:
-        it = iter(neg[ : testCount])
-        for posfile in pos[ : testCount]:
-            negfile = next(it)    
-            print >>testf, posfile + ' 1'        
-            print >>testf, negfile + ' 0'
-    
-    negListLabeled = [[i,0] for i in negList]
-    posListLabeled = [[i,1] for i in posList]
-
-    allListLabeled = posListLabeled+negListLabeled
-
-    allLabeled = random.sample(allListLabeled, testCount*2)
-    
-    with open(os.path.join(pathOut, 'tileList-test-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as testf:
-        for file,label in allLabeled:   
-            print >>testf, posfile + ' ' + str(label)   
+        pos = random.sample(posList, min([testCount, len(posList)])) 
+        neg = random.sample(negList, min([testCount, len(negList)]))
+        
+        print 'used test pos: ' + str(len(pos))
+        print 'used test neg: ' + str(len(neg))
+        
+        with open(os.path.join(pathOut, 'tileList-test-test-cv-'+kn+'.txt'), 'w') as testf:
+            it = iter(neg[ : testCount])
+            for posfile in pos[ : testCount]:
+                negfile = next(it)    
+                print >>testf, posfile + ' 1'        
+                print >>testf, negfile + ' 0'
     return True
 
 if __name__ == "__main__":
@@ -164,19 +157,14 @@ if __name__ == "__main__":
     pathOut = sys.argv[2]
     pathImages = sys.argv[3]
     samplesListFile = sys.argv[4]
+    n = int(sys.argv[5])
     
     print 'pathTiles:', pathTiles
     print 'pathOut:', pathOut
     print 'pathImages:', pathImages
     print 'samplesListFile:', samplesListFile
-    
-    if (len(sys.argv)>6):
-        k = int(sys.argv[5])
-        n = int(sys.argv[6])
-    else:
-        k=0
-        n=1
+    print 'n:', n
         
-    success = main(pathTiles, pathOut, pathImages,samplesListFile, k, n)
+    success = main(pathTiles, pathOut, pathImages,samplesListFile, n)
     if not success:
         sys.exit(1)
