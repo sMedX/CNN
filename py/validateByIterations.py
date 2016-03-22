@@ -1,5 +1,5 @@
 from __future__ import division
-from subprocess import call
+from subprocess import cal
 import os
 from os import path
 
@@ -10,6 +10,8 @@ sampleListName='test-cv-3-4.txt'
 spacing='1.5'
 classCount='2'
 mask = preset+'.nrrd-boundingRec-r5.nrrd'
+sigma='4.000000' #format is important for cpp code
+forceOverwrite = False
 
 #dir='D:/alex/images'
 samplesList=os.path.join('C:/caffe/',preset,ver,sampleListName)
@@ -36,7 +38,6 @@ outFile = open('VOEByIters-'+preset+suffix+'.csv', 'w', unbuffered)
 
 outFile.write('iter; avg VOE class; avg VOE largest Object, avg VOE Smoothed;\n')
 
-dbg = True###
 for iter in range(5000,150000,5000):
     print iter
     model=os.path.join(snapshotPrefix, preset, ver,'_iter_'+str(iter)+'.caffemodel')
@@ -44,24 +45,24 @@ for iter in range(5000,150000,5000):
     count=0
     with open(samplesList) as f:
         for line in f:
-             path = line.replace('\n','')
-             outputImage=os.path.join(path,preset+suffix+'.nrrd')
-             
-             if not dbg:
+            path = line.replace('\n','')
+            outputImage=os.path.join(path,preset+suffix+'.nrrd')
+            if forceOverwrite or not isfile(outputImage):
                 args=[exeClass,deploy,model,startX,startY,startZ,sizeX,sizeY,sizeZ,r,preset,spacing,batchLength,groupX,groupY,classCount,os.path.join(path,'patient.nrrd'),os.path.join(path,mask),outputImage,deviceId]
                 #print args
                 call(args)
-                dbg=False
-             
-             sigma='4'
-             call([postproc, '-image', os.path.join(line, outputImage), '-gaussianVariance', sigma, '-preset', preset])  
-             
-             voe=[0,0,0]
-             voe[0]=call([exeValid,  '-testImage', outputImage, '-label', os.path.join(path,preset+'.nrrd')])
-             voe[1]=call([exeValid,  '-testImage', outputImage+'-largestObject.nrrd', '-label', os.path.join(path,preset+'.nrrd')])
-             voe[2]=call([exeValid,  '-testImage', outputImage+'-gaussian4.000000.nrrd', '-label', os.path.join(path,preset+'.nrrd')])
-             
-             print 'voe: ', voe
-             sumVOE+=voe
-             count+=1
+
+            postprocessedImage1 = outputImage+'-largestObject.nrrd'
+            postprocessedImage2 = outputImage+'-gaussian'+sigma+'.nrrd'
+            if forceOverwrite or not isfile(outputImage) or not isfile(outputImage):
+                call([postproc, '-image', os.path.join(line, outputImage), '-gaussianVariance', sigma, '-preset', preset])  
+            
+            voe=[0,0,0]
+            voe[0]=call([exeValid,  '-testImage', outputImage, '-label', os.path.join(path,preset+'.nrrd')])
+            voe[1]=call([exeValid,  '-testImage', postprocessedImage1, '-label', os.path.join(path,preset+'.nrrd')])
+            voe[2]=call([exeValid,  '-testImage', postprocessedImage2, '-label', os.path.join(path,preset+'.nrrd')])
+          
+            print 'voe: ', voe
+            sumVOE+=voe
+            count+=1
     outFile.write(str(iter)+';'+str(sumVOE[0]/count)+';'+str(sumVOE[1]/count)+';'+str(sumVOE[2]/count)+'\n')
