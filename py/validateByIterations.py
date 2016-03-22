@@ -3,12 +3,18 @@ from subprocess import call
 import os
 from os import path
 
-ver='25'
-preset='livertumors'
-dir='D:\\alex\\images'
-#samplesList=os.path.join(dir,preset,'samplesList.txt')###
-samplesList='C:\\caffe\\livertumors\\25\\test-cv-3-4.txt' ### test-cv-3-4.txt
+# params
+ver='2'
+preset='liver'
+sampleListName='test-cv-3-4.txt'
+spacing='1.5'
+classCount='2'
+mask = preset+'.nrrd-boundingRec-r5.nrrd'
+
+#dir='D:/alex/images'
+samplesList=os.path.join('C:/caffe/',preset,ver,sampleListName)
 exeClass='D:/alex/nets_pancreas/caffe-win-1029/bin/class_new.exe'
+postproc = 'D:/alex/CNN-build/postprocessing/Release/postprocessing.exe'
 exeValid='D:/alex/CNN-build/validation/Release/validationRetVOE.exe'
 deploy='C:/caffe/'+preset+'/'+ver+'/deploy.prototxt'
 startX='0'
@@ -18,34 +24,44 @@ sizeX='512'
 sizeY='512'
 sizeZ='1000'
 r='32'
-spacing='0.782'###
 batchLength='1024'
 groupX='3'
 groupY='3'
-classCount='2'###
 deviceId='0'
 suffix='-v'+ver+'-g'+groupX+'x'+groupY+'-c'+classCount+'-s'+spacing
-
-mask = 'liver.nrrd'#preset+'.nrrd-boundingRec-r5.nrrd'
-
-unbuffered=0
-outFile = open('iterationsVOETrain'+preset+'-test'+suffix+'.txt', 'w', unbuffered)### todo remove 'test'
 snapshotPrefix='D:/artem/caffe/snap'
 
+unbuffered=0
+outFile = open('VOEByIters-'+preset+suffix+'.csv', 'w', unbuffered)
+
+outFile.write('iter; avg VOE class; avg VOE largest Object, avg VOE Smoothed;\n')
+
+dbg = True###
 for iter in range(5000,150000,5000):
     print iter
     model=os.path.join(snapshotPrefix, preset, ver,'_iter_'+str(iter)+'.caffemodel')
-    sumVOE=0
-    countVOE=0
+    sumVOE=[0, 0, 0] ###
+    count=0
     with open(samplesList) as f:
         for line in f:
              path = line.replace('\n','')
              outputImage=os.path.join(path,preset+suffix+'.nrrd')
-             args=[exeClass,deploy,model,startX,startY,startZ,sizeX,sizeY,sizeZ,r,preset,spacing,batchLength,groupX,groupY,classCount,os.path.join(path,'patient.nrrd'),os.path.join(path,mask),outputImage,deviceId]
-             #print args
-             call(args)
-             voe=call([exeValid,  '-testImage', outputImage, '-label', os.path.join(path,preset+'.nrrd')])
-             print 'voe: '+str(voe)
+             
+             if not dbg:
+                args=[exeClass,deploy,model,startX,startY,startZ,sizeX,sizeY,sizeZ,r,preset,spacing,batchLength,groupX,groupY,classCount,os.path.join(path,'patient.nrrd'),os.path.join(path,mask),outputImage,deviceId]
+                #print args
+                call(args)
+                dbg=False
+             
+             sigma='4'
+             call([postproc, '-image', os.path.join(line, outputImage), '-gaussianVariance', sigma, '-preset', preset])  
+             
+             voe=[0,0,0]
+             voe[0]=call([exeValid,  '-testImage', outputImage, '-label', os.path.join(path,preset+'.nrrd')])
+             voe[1]=call([exeValid,  '-testImage', outputImage+'-largestObject.nrrd', '-label', os.path.join(path,preset+'.nrrd')])
+             voe[2]=call([exeValid,  '-testImage', outputImage+'-gaussian4.000000.nrrd', '-label', os.path.join(path,preset+'.nrrd')])
+             
+             print 'voe: ', voe
              sumVOE+=voe
-             countVOE+=1
-    outFile.write(str(iter)+' '+str(sumVOE/countVOE)+'\n')
+             count+=1
+    outFile.write(str(iter)+';'+str(sumVOE[0]/count)+';'+str(sumVOE[1]/count)+';'+str(sumVOE[2]/count)+'\n')
