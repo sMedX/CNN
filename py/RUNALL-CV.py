@@ -109,7 +109,7 @@ def main():
         with open(samplesList) as f:
             for line in f:
                 line = line.replace('\n','')
-                subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma])
+                subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma, '-preset', preset])
         
         suffix = suffix + '-gaussian' + sigma + '.nrrd'
         outputCNN = preset + '-cnn' + suffix
