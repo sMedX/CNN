@@ -13,7 +13,7 @@
 #include "agtkTypes.h"
 #include "agtkIO.h"
 #include "agtkCommandLineArgumentParser.h"
-#include "agtkBinaryImageUtilities.h"
+#include "itkBinaryDilateImageFilter.h"
 
 int main(int argc, char* argv[])
 {
@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
   std::cout << "inputData.size() " << inputDirs.size() << std::endl;
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
-  omp_set_num_threads(24); // Use 24 threads
+  omp_set_num_threads(24); // Use half threads
 
 #pragma omp parallel for
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
@@ -73,17 +73,19 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    auto rec = agtk::getBinaryMaskBoundingBoxRegion(mask);
-    rec.PadByRadius(radius);
-    rec.Crop(mask->GetLargestPossibleRegion());
+    typedef itk::BinaryBallStructuringElement<BinaryImage3D::PixelType, BinaryImage3D::ImageDimension> StructuringElementType;
+    StructuringElementType structuringElement;
+    StructuringElementType::SizeType radius3D = { radius, radius, radius * mask->GetSpacing()[0] / mask->GetSpacing()[2] };
+    structuringElement.SetRadius(radius3D);
+    structuringElement.CreateStructuringElement();
 
-    mask->SetBufferedRegion(rec);
-    mask->FillBuffer(1);
+    typedef itk::BinaryDilateImageFilter <BinaryImage3D, BinaryImage3D, StructuringElementType> BinaryDilateImageFilterType;
 
-    mask->SetBufferedRegion(mask->GetLargestPossibleRegion());
+    BinaryDilateImageFilterType::Pointer dilateFilter = BinaryDilateImageFilterType::New();
+    dilateFilter->SetInput(mask);
+    dilateFilter->SetKernel(structuringElement);
 
-    writeImage(mask.GetPointer(), outputFile);
-
+    writeImage(dilateFilter->GetOutput(), outputFile);
   }
   return EXIT_SUCCESS;
 };
