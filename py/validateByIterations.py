@@ -1,5 +1,5 @@
 from __future__ import division
-from subprocess import cal
+from subprocess import call
 import os
 from os import path
 
@@ -9,7 +9,7 @@ preset='liver'
 sampleListName='test-cv-3-4.txt'
 spacing='1.5'
 classCount='2'
-mask = preset+'.nrrd-boundingRec-r5.nrrd'
+mask = preset+'.nrrd-boundingRec-r64.nrrd'
 sigma='4.000000' #format is important for cpp code
 forceOverwrite = False
 
@@ -47,15 +47,17 @@ for iter in range(5000,150000,5000):
         for line in f:
             path = line.replace('\n','')
             outputImage=os.path.join(path,preset+suffix+'.nrrd')
-            if forceOverwrite or not isfile(outputImage):
+            if forceOverwrite or not os.path.isfile(outputImage):
                 args=[exeClass,deploy,model,startX,startY,startZ,sizeX,sizeY,sizeZ,r,preset,spacing,batchLength,groupX,groupY,classCount,os.path.join(path,'patient.nrrd'),os.path.join(path,mask),outputImage,deviceId]
                 #print args
                 call(args)
 
             postprocessedImage1 = outputImage+'-largestObject.nrrd'
             postprocessedImage2 = outputImage+'-gaussian'+sigma+'.nrrd'
-            if forceOverwrite or not isfile(outputImage) or not isfile(outputImage):
-                call([postproc, '-image', os.path.join(line, outputImage), '-gaussianVariance', sigma, '-preset', preset])  
+            if forceOverwrite or not os.path.isfile(postprocessedImage1) or not os.path.isfile(postprocessedImage2):
+                args = [postproc, '-image', os.path.join(line, outputImage), '-gaussianVariance', sigma, '-preset', preset]
+                print args
+                call(args)  
             
             voe=[0,0,0]
             voe[0]=call([exeValid,  '-testImage', outputImage, '-label', os.path.join(path,preset+'.nrrd')])
