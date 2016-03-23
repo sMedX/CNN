@@ -60,8 +60,8 @@ int main(int argc, char* argv[])
 #pragma omp parallel for
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
     auto inputDir = inputDirs[iImage];
-    auto maskFile = inputDir + "\\" + maskName;
-    auto outputFile = inputDir + "\\" + maskName + "-boundingRec-r" + std::to_string(radius) + ".nrrd";
+    auto maskFile = inputDir + "/" + maskName;
+    auto outputFile = inputDir + "/" + maskName + "-dilate-r" + std::to_string(radius) + ".nrrd";
 
     std::cout << "maskFile " << maskFile << std::endl;
 
