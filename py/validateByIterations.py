@@ -6,10 +6,10 @@ from os import path
 # params
 ver='2'
 preset='liver'
-sampleListName='test-cv-3-4.txt'
+sampleListName='train-cv-3-4.txt'
 spacing='1.5'
-classCount='2'
-mask = preset+'.nrrd-boundingRec-r64.nrrd'
+classCount='3'
+mask = preset+'.nrrd-dilate-r64.nrrd'
 sigma='4.000000' #format is important for cpp code
 forceOverwrite = False
 
@@ -29,16 +29,16 @@ r='32'
 batchLength='1024'
 groupX='3'
 groupY='3'
-deviceId='0'
+deviceId='1'
 suffix='-v'+ver+'-g'+groupX+'x'+groupY+'-c'+classCount+'-s'+spacing
 snapshotPrefix='D:/artem/caffe/snap'
 
 unbuffered=0
-outFile = open('VOEByIters-'+preset+suffix+'.csv', 'w', unbuffered)
+outFile = open('VOEByIters-'+preset+suffix+'-train.csv', 'w', unbuffered)
 
 outFile.write('iter; avg VOE class; avg VOE largest Object, avg VOE Smoothed;\n')
 
-for iter in range(5000,150000,5000):
+for iter in range(5000,80000,5000):
     print iter
     model=os.path.join(snapshotPrefix, preset, ver,'_iter_'+str(iter)+'.caffemodel')
     sumVOE=[0, 0, 0] ###
@@ -67,4 +67,6 @@ for iter in range(5000,150000,5000):
             print 'voe: ', voe
             sumVOE+=voe
             count+=1
+            
+            print 'avg voe', sumVOE[0] / count,  sumVOE[1] / count,  sumVOE[2] / count
     outFile.write(str(iter)+';'+str(sumVOE[0]/count)+';'+str(sumVOE[1]/count)+';'+str(sumVOE[2]/count)+'\n')

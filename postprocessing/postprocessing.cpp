@@ -28,6 +28,8 @@ int main(int argc, char** argv)
   parser->GetValue("-preset", preset);
 
   std::cout << "image file  " << imageFile << std::endl;
+  std::cout << "gaussianVariance  " << gaussianVariance << std::endl;
+  std::cout << "preset  " << preset << std::endl;
 
   // read images
   auto image = BinaryImage3D::New(); //float is special
@@ -36,6 +38,7 @@ int main(int argc, char** argv)
   }
 
   if (preset == "liver") {
+    std::cout << "liver" << std::endl;
     image = agtk::getLargestObjectFromBinaryImage(image);
     writeImage(image, imageFile + "-largestObject.nrrd");
   }
