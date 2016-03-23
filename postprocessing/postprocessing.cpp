@@ -4,6 +4,8 @@
 #include "agtkCommandLineArgumentParser.h"
 #include "agtkTypes.h"
 #include "agtkIO.h"
+#include "agtkBinaryImageUtilities.h"
+
 #include <itkDiscreteGaussianImageFilter.h>
 #include <itkBinaryThresholdImageFilter.h>
 
@@ -22,17 +24,28 @@ int main(int argc, char** argv)
   float gaussianVariance;
   parser->GetValue("-gaussianVariance", gaussianVariance);
 
+  std::string preset;
+  parser->GetValue("-preset", preset);
+
   std::cout << "image file  " << imageFile << std::endl;
 
   // read images
-  FloatImage3D::Pointer image = FloatImage3D::New(); //float is special
-  if (!readImage<FloatImage3D>(image, imageFile)) {
+  auto image = BinaryImage3D::New(); //float is special
+  if (!readImage<BinaryImage3D>(image, imageFile)) {
     return EXIT_FAILURE;
   }
 
+  if (preset == "liver") {
+    try {
+      image = agtk::getLargestObjectFromBinaryImage(image);
+    } catch (itk::ExceptionObject& e) {
+      e.Print(std::cout);
+    }
+    writeImage(image, imageFile + "-largestObject.nrrd");
+  }
   // blur
   // Create and setup a Gaussian filter
-  typedef itk::DiscreteGaussianImageFilter<FloatImage3D, FloatImage3D >  filterType;
+  typedef itk::DiscreteGaussianImageFilter<BinaryImage3D, FloatImage3D >  filterType;
   filterType::Pointer gaussianFilter = filterType::New();
   gaussianFilter->SetInput(image);
   gaussianFilter->SetVariance(gaussianVariance);
