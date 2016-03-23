@@ -46,7 +46,7 @@ for iter in range(5000,150000,5000):
     with open(samplesList) as f:
         for line in f:
             path = line.replace('\n','')
-            outputImage=os.path.join(path,preset+suffix+'.nrrd')
+            outputImage=os.path.join(path,preset+suffix+'-it'+str(iter)+'.nrrd')
             if forceOverwrite or not os.path.isfile(outputImage):
                 args=[exeClass,deploy,model,startX,startY,startZ,sizeX,sizeY,sizeZ,r,preset,spacing,batchLength,groupX,groupY,classCount,os.path.join(path,'patient.nrrd'),os.path.join(path,mask),outputImage,deviceId]
                 #print args
