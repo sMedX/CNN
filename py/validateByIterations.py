@@ -6,12 +6,13 @@ from os import path
 # params
 ver='2'
 preset='liver'
-sampleListName='train-cv-3-4.txt'
+sampleListName='test-cv-3-4.txt'
 spacing='1.5'
 classCount='3'
 mask = preset+'.nrrd-dilate-r64.nrrd'
 sigma='4.000000' #format is important for cpp code
 forceOverwrite = False
+kn='3-4'
 
 #dir='D:/alex/images'
 samplesList=os.path.join('C:/caffe/',preset,ver,sampleListName)
@@ -34,13 +35,15 @@ suffix='-v'+ver+'-g'+groupX+'x'+groupY+'-c'+classCount+'-s'+spacing
 snapshotPrefix='D:/artem/caffe/snap'
 
 unbuffered=0
-outFile = open('VOEByIters-'+preset+suffix+'-train.csv', 'w', unbuffered)
+outFile = open('VOEByIters-'+preset+suffix+'-'+sampleListName.replace('.txt','')+'.csv', 'w', unbuffered)
 
 outFile.write('iter; avg VOE class; avg VOE largest Object, avg VOE Smoothed;\n')
 
 for iter in range(5000,80000,5000):
     print iter
-    model=os.path.join(snapshotPrefix, preset, ver,'_iter_'+str(iter)+'.caffemodel')
+    snapshotFolder = os.path.join(snapshotPrefix, preset, ver, kn)
+    model = os.path.join(snapshotFolder, '_iter_' + str(iter) + '.caffemodel')
+
     sumVOE=[0, 0, 0] ###
     count=0
     with open(samplesList) as f:
@@ -65,7 +68,8 @@ for iter in range(5000,80000,5000):
             voe[2]=call([exeValid,  '-testImage', postprocessedImage2, '-label', os.path.join(path,preset+'.nrrd')])
           
             print 'voe: ', voe
-            sumVOE+=voe
+            for i in range(0, 3):
+                sumVOE[i]+=voe[i]
             count+=1
             
             print 'avg voe', sumVOE[0] / count,  sumVOE[1] / count,  sumVOE[2] / count
