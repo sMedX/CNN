@@ -38,13 +38,14 @@ namespace
         it.Set((it.Get() + shift) / squeeze);
       }
     } else if (preset == "livertumors") {
-      //const int shift = 40;
+      const int shift = 40;
 
-      //// x' = x + shift
-      //itk::ImageRegionIterator<Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
-      //for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-      //  it.Set(it.Get() + shift);
-      //}
+      // x' = x + shift
+      itk::ImageRegionIterator<Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
+      for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+        it.Set(it.Get() + shift);
+      }
+
       int radius = 5;
       float alpha = 0.3;
       float beta = 0.3;
@@ -64,6 +65,7 @@ namespace
       equalize->SetInput(image16);
       equalize->Update();
       equalize->Print(std::cout);
+      image16 = equalize->GetOutput();
     }
     std::cout << "cast (truncate)" << std::endl;
     // force integer overflow

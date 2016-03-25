@@ -1,4 +1,4 @@
-//#include <cuda_runtime.h>
+#include <cuda_runtime.h>
 
 #include <cstring>
 #include <cstdlib>
@@ -21,9 +21,9 @@
 
 #include "preprocess.h"
 
-bool writeImage(const std::string& outputFile, const agtk::BinaryImage3D::Pointer& outImage)
+bool writeImage(const std::string& outputFile, const BinaryImage3D::Pointer& outImage)
 {
-  typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
+  typedef itk::ImageFileWriter<BinaryImage3D>  writerType;
   writerType::Pointer writer = writerType::New();
   writer->SetFileName(outputFile);
   writer->SetInput(outImage);
@@ -37,78 +37,8 @@ bool writeImage(const std::string& outputFile, const agtk::BinaryImage3D::Pointe
   return true;
 }
 
-int main(int argc, char** argv)
+bool classify(caffe::Net<float>& caffeNet, std::string& preset, std::string& input_file, std::string& mask_file, Image3DRegion& region, int radiusXY, float spacingXY, int batchLength, int groupX, int groupY, int classCount, bool isRgb, BinaryImage3D::Pointer& outImage, int& retCode)
 {
-  using namespace std;
-  using namespace caffe;
-  using namespace agtk;
-
-  string model_file = argv[1];
-  string trained_file = argv[2];
-
-  string start_x_str = argv[3];
-  string start_y_str = argv[4];
-  string start_z_str = argv[5];
-
-  string size_x_str = argv[6];
-  string size_y_str = argv[7];
-  string size_z_str = argv[8];
-
-  string radiusXY_str = argv[9];
-  string preset = argv[10];
-  string spacingXY_str = argv[11];
-
-  string batchLengthStr = argv[12];
-
-  string groupXStr = argv[13]; // interpret an area XxY as 1 unit
-  string groupYStr = argv[14];
-
-  string classCountStr = argv[15];
-
-  string input_file = argv[16];
-  string mask_file = argv[17];
-  string outputFile = argv[18];
-
-  string deviceIdStr = argv[19];
-
-  Image3DIndex start;
-  start[0] = atoi(start_x_str.c_str());
-  start[1] = atoi(start_y_str.c_str());
-  start[2] = atoi(start_z_str.c_str());
-
-  Image3DSize size;
-  size[0] = atoi(size_x_str.c_str());
-  size[1] = atoi(size_y_str.c_str());
-  size[2] = atoi(size_z_str.c_str());
-
-  Image3DRegion region;
-  region.SetIndex(start);
-  region.SetSize(size);
-
-  int radiusXY = atoi(radiusXY_str.c_str());
-  float spacingXY = atof(spacingXY_str.c_str());
-  int batchLength = atoi(batchLengthStr.c_str());
-  int groupX = atoi(groupXStr.c_str());
-  int groupY = atoi(groupYStr.c_str());
-  int classCount = atoi(classCountStr.c_str());
-  int deviceId = atoi(deviceIdStr.c_str());
-  bool isRgb = false; //TODO
-
-  std::cout << "model_file = " << model_file << std::endl <<
-    "trained_file =" << trained_file << std::endl <<
-    "region = " << region << std::endl <<
-    "radiusXY=" << radiusXY << std::endl <<
-    "preset=" << preset << std::endl <<
-    "spacingXY=" << spacingXY << std::endl <<
-    "batchSize=" << batchLength << std::endl <<
-    "groupX=" << groupX << std::endl <<
-    "groupY=" << groupY << std::endl <<
-    "classCount=" << classCount << std::endl <<
-    "input_file = " << input_file << std::endl <<
-    "mask_file =" << mask_file << std::endl <<
-    "output_file =" << outputFile << std::endl <<
-    "deviceID =" << deviceId << std::endl;
-
   if (classCount < 1 && classCount > 3) {
     std::cout << "classCount must be 1, 2, 3 or 4";
   }
@@ -133,7 +63,8 @@ int main(int argc, char** argv)
   } catch (itk::ExceptionObject &excp) {
     std::cout << "Exception thrown while reading the image " << std::endl;
     std::cout << excp << std::endl;
-    return EXIT_FAILURE;
+    retCode = EXIT_FAILURE;
+    return true;
   }
   std::cout << "." << std::endl;
 
@@ -148,15 +79,14 @@ int main(int argc, char** argv)
     } catch (itk::ExceptionObject &excp) {
       std::cout << "Exception thrown while reading the mask " << std::endl;
       std::cout << excp << std::endl;
-      return EXIT_FAILURE;
+      retCode = EXIT_FAILURE;
+      return true;
     }
     imageMask = readerMask->GetOutput();
   }
   std::cout << "." << std::endl;
 
   Int16Image3D::Pointer image16 = reader->GetOutput();
-
-  //auto initialSpacing = image16->GetSpacing(); //todo remove
 
   UInt8Image3D::Pointer image8 = UInt8Image3D::New();
   UInt8Image3D::Pointer imageNull = nullptr;
@@ -172,7 +102,8 @@ int main(int argc, char** argv)
   if (imageMask != nullptr) {
     if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
       std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
-      return EXIT_FAILURE;
+      retCode = EXIT_FAILURE;
+      return true;
     }
   }
 
@@ -188,7 +119,7 @@ int main(int argc, char** argv)
   shrinkRegion.ShrinkByRadius(radius3D);
   region.Crop(shrinkRegion);
 
-  vector<Image3DIndex> indices;
+  std::vector<Image3DIndex> indices;
   std::cout << "region: " << region << std::endl;
   if (imageMask.IsNotNull()) {
     std::cout << "use mask" << std::endl;
@@ -224,7 +155,7 @@ int main(int argc, char** argv)
 
   std::cout << "total count:" << totalCount << std::endl;
 
-  BinaryImage3D::Pointer outImage = BinaryImage3D::New();
+  outImage = BinaryImage3D::New();
   outImage->CopyInformation(image);
   outImage->SetRegions(image->GetLargestPossibleRegion());
   outImage->Allocate();
@@ -236,16 +167,6 @@ int main(int argc, char** argv)
   int posCount = 0;
 
   std::cout << "Applying CNN in deploy config" << std::endl;
-
-  //Setting CPU or GPU
-  Caffe::set_mode(Caffe::GPU);
-  Caffe::SetDevice(deviceId);
-
-  std::cout << "create net" << std::endl;
-  Net<float> caffe_test_net(model_file, TEST);
-
-  std::cout << "load net's weights" << std::endl;
-  caffe_test_net.CopyTrainedLayersFrom(trained_file);
 
   float* buffer = image->GetBufferPointer();
 
@@ -271,7 +192,7 @@ int main(int argc, char** argv)
     auto time0 = clock();
     std::cout << i << "th batch" << std::endl;
 
-    Blob<float>* blob = new Blob<float>(batchLength, channels, height, width);
+    caffe::Blob<float>* blob = new caffe::Blob<float>(batchLength, channels, height, width);
 
     //int lastX = -1; // we dont use last z and assume thay 'z' stay same
     for (int iTile = 0; iTile < batchLength; ++iTile) {
@@ -313,13 +234,13 @@ int main(int argc, char** argv)
     }
 
     //fill the vector
-    vector<Blob<float>*> bottom;
+    std::vector<caffe::Blob<float>*> bottom;
     bottom.push_back(blob);
     float type = 0.0;
 
     auto time1 = clock();
 
-    auto results = caffe_test_net.Forward(bottom, &type)[0]->cpu_data();
+    auto results = caffeNet.Forward(bottom, &type)[0]->cpu_data();
     delete blob;
 
     auto time2 = clock();
@@ -379,13 +300,108 @@ int main(int argc, char** argv)
 
   std::cout << "positives:" << posCount << std::endl;
  
-  //writeImage(outputFile + "_pp.nrrd", outImage); image before postprocessing
-
   //postprocess
   //resampling back
   if (spacingXY != 0) { //resample image by axial slices
     std::cout << "resample" << std::endl;
     outImage = resamplingLike(outImage.GetPointer(), image16.GetPointer());
+  }
+  return false;
+}
+
+void loadNet(std::string& modelFile, std::string trainedFile, int deviceId, OUT caffe::Net<float>& caffeNet)
+{
+  caffe::Caffe::set_mode(caffe::Caffe::GPU);
+  caffe::Caffe::SetDevice(deviceId);
+
+  std::cout << "create net" << std::endl;
+  caffeNet = caffe::Net<float>(modelFile, caffe::TEST);
+
+  std::cout << "load net's weights" << std::endl;
+  caffeNet.CopyTrainedLayersFrom(trainedFile);
+}
+
+int main(int argc, char** argv)
+{
+  using namespace caffe;
+  using namespace agtk;
+
+  string modelFile = argv[1];
+  string trainedFile = argv[2];
+
+  string startXStr = argv[3];
+  string startYStr = argv[4];
+  string startZStr = argv[5];
+
+  string sizeXStr = argv[6];
+  string sizeYStr = argv[7];
+  string sizeZStr = argv[8];
+
+  string radiusXYStr = argv[9];
+  string preset = argv[10];
+  string spacingXYStr = argv[11];
+
+  string batchLengthStr = argv[12];
+
+  string groupXStr = argv[13]; // interpret an area XxY as 1 unit
+  string groupYStr = argv[14];
+
+  string classCountStr = argv[15];
+
+  string inputFile = argv[16];
+  string maskFile = argv[17];
+  string outputFile = argv[18];
+
+  string deviceIdStr = argv[19];
+
+  Image3DIndex start;
+  start[0] = atoi(startXStr.c_str());
+  start[1] = atoi(startYStr.c_str());
+  start[2] = atoi(startZStr.c_str());
+
+  Image3DSize size;
+  size[0] = atoi(sizeXStr.c_str());
+  size[1] = atoi(sizeYStr.c_str());
+  size[2] = atoi(sizeZStr.c_str());
+
+  Image3DRegion region;
+  region.SetIndex(start);
+  region.SetSize(size);
+
+  int radiusXY = atoi(radiusXYStr.c_str());
+  float spacingXY = atof(spacingXYStr.c_str());
+  int batchLength = atoi(batchLengthStr.c_str());
+  int groupX = atoi(groupXStr.c_str());
+  int groupY = atoi(groupYStr.c_str());
+  int classCount = atoi(classCountStr.c_str());
+  int deviceId = atoi(deviceIdStr.c_str());
+  bool isRgb = false; //TODO
+
+  std::cout << "modelFile = " << modelFile << std::endl <<
+    "trainedFile =" << trainedFile << std::endl <<
+    "region = " << region << std::endl <<
+    "radiusXY=" << radiusXY << std::endl <<
+    "preset=" << preset << std::endl <<
+    "spacingXY=" << spacingXY << std::endl <<
+    "batchSize=" << batchLength << std::endl <<
+    "groupX=" << groupX << std::endl <<
+    "groupY=" << groupY << std::endl <<
+    "classCount=" << classCount << std::endl <<
+    "inputFile = " << inputFile << std::endl <<
+    "maskFile =" << maskFile << std::endl <<
+    "outputFile =" << outputFile << std::endl <<
+    "deviceID =" << deviceId << std::endl;
+
+  //Setting CPU or GPU
+  caffe::Net<float> caffeNet;
+  loadNet(modelFile, trainedFile, deviceId, caffeNet);
+
+  BinaryImage3D::Pointer outImage;
+  int retCode;
+
+  classify(caffeNet, preset, inputFile, maskFile, region, radiusXY, spacingXY, batchLength, groupX, groupY, classCount, isRgb, outImage, retCode);
+  if (retCode == EXIT_FAILURE) {
+    return retCode;
   }
 
   std::cout << "save" << std::endl;

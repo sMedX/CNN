@@ -21,13 +21,13 @@ add_executable(moveTumorHack ${SOURCES})
 TARGET_LINK_LIBRARIES(moveTumorHack ${LIBRARIES} )
 
 #
-project(createRectangleMaskAroundMask)
+project(dilateMask)
 
-set(SOURCES "createRectangleMaskAroundMask.cpp")
+set(SOURCES "dilateMask.cpp")
 
-add_executable(createRectangleMaskAroundMask ${SOURCES})
+add_executable(dilateMask ${SOURCES})
 
-TARGET_LINK_LIBRARIES(createRectangleMaskAroundMask ${LIBRARIES} )
+TARGET_LINK_LIBRARIES(dilateMask ${LIBRARIES} )
 #
 set(SOURCES "cutImageBySlices.cpp" "preprocess.h")
 
