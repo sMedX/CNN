@@ -1,4 +1,4 @@
-#from __future__ import division
+#TODO need update like 2-class version
 
 import os 
 import itertools
@@ -20,6 +20,8 @@ def main(pathTiles, pathOut, pathImages, k, n):
         return
     
     classCount = 3
+    classesFrequency = [1 1 1]
+    
     preset = pathOut.replace('\\', '/').split('/')[-2]
     print 'preset: ', preset
 
@@ -74,21 +76,19 @@ def main(pathTiles, pathOut, pathImages, k, n):
         if count < minCount:
             minCount = count;        
 
-    testf = open(os.path.join(pathOut, 'tileList-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
-    trainf = open(os.path.join(pathOut, 'tileList-train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
+    with open(os.path.join(pathOut, 'tileList-test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as testf:
     
     for file0 in classes[0].fileList[ : testCount]:
-        print >>testf, file0 + ' 0'        
-        #print >>trainf, file0 + ' 0'        
+        print >>testf, file0 + ' 0'           
         for i in range(1, classCount):
             fileI = next(classes[i].testIter, None)    
             if fileI != None:
                 print >>testf, fileI + ' ' + str(i)
-                #print >>trainf, classes[i].pathTiles + '/' + fileI + ' ' + str(i)
 
     #trainCount = minCount
     trainCount = 2000000
-
+    
+    trainf = open(os.path.join(pathOut, 'tileList-train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w')
     for file0 in classes[0].fileList[ : trainCount]:
         print >>trainf, file0 + ' 0'        
         for i in range(1, classCount):
@@ -97,22 +97,7 @@ def main(pathTiles, pathOut, pathImages, k, n):
                 print >>trainf, fileI + ' ' + str(i)
 
     return
-
-    it = iter(notum[testCount :])
-    for tumfile in tum[testCount :]:
-        print >>trainf,tumfile + ' 1'        
-        notumfile = next(it)    
-        print >>trainf, notumfile + ' 0'
-        notumfile = next(it)    
-        print >>trainf, notumfile + ' 0'
-        notumfile = next(it)    
-        #print >>trainf, notumfile + ' 0'
-        #notumfile = next(it)    
-        #print >>trainf, notumfile + ' 0'
-                
-    return
-
-
+    
 if __name__ == "__main__":
     print 'Number of arguments:', len(sys.argv), 'arguments.'
     print 'Argument List:', str(sys.argv)
