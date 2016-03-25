@@ -1,8 +1,8 @@
 cmake_minimum_required (VERSION 2.8.11)
 project(validation)
 
-include_directories(${INCLUDE_DIRS})
-list(APPEND LIBRARIES ${LIBRARIES})
+include_directories(${AGTK_INCLUDE_DIRS})
+list(APPEND LIBRARIES ${AGTK_LIBRARIES})
 
 #
 set(SOURCES "validation.cpp")
