@@ -219,13 +219,16 @@ int main(int argc, char* argv[])
       class1Count = indices.size() - negativeCount / strideNegative;
     } else {
       std::cout << "use mask" << std::endl;
+      mask->Print(std::cout);
+      wholeRegion.Print(std::cout);
+
       itk::ImageRegionConstIterator<BinaryImage3D> itMask(mask, wholeRegion);
 
       for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
         if (itMask.Get() != 0) {
           auto& index = itMask.GetIndex();
 
-          if (label2->GetPixel(index) != 0) {// if 2 class
+          if (label2.IsNotNull() && label2->GetPixel(index) != 0) {// if 2 class
             indices.push_back(index);
             class2Count++;
           } else if (label1->GetPixel(index) != 0) {// if 1 class
