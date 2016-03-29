@@ -9,11 +9,12 @@
 #include <itkImage.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
+#include <itkMinimumMaximumImageCalculator.h>
+#include "itkBinaryDilateImageFilter.h"
 
 #include "agtkTypes.h"
 #include "agtkIO.h"
 #include "agtkCommandLineArgumentParser.h"
-#include "itkBinaryDilateImageFilter.h"
 
 int main(int argc, char* argv[])
 {
@@ -73,9 +74,16 @@ int main(int argc, char* argv[])
       continue;
     }
 
+    typedef itk::MinimumMaximumImageCalculator <BinaryImage3D> ImageCalculatorFilterType;
+    ImageCalculatorFilterType::Pointer imageCalculatorFilter = ImageCalculatorFilterType::New();
+    imageCalculatorFilter->SetImage(mask);
+    imageCalculatorFilter->ComputeMaximum();
+
     typedef itk::BinaryBallStructuringElement<BinaryImage3D::PixelType, BinaryImage3D::ImageDimension> StructuringElementType;
     StructuringElementType structuringElement;
     StructuringElementType::SizeType radius3D = { radius, radius, radius * mask->GetSpacing()[0] / mask->GetSpacing()[2] };
+    std::cout << "radius 3d: " << radius3D << std::endl;
+
     structuringElement.SetRadius(radius3D);
     structuringElement.CreateStructuringElement();
 
@@ -83,7 +91,9 @@ int main(int argc, char* argv[])
 
     BinaryDilateImageFilterType::Pointer dilateFilter = BinaryDilateImageFilterType::New();
     dilateFilter->SetInput(mask);
+    dilateFilter->SetDilateValue(imageCalculatorFilter->GetMaximum());
     dilateFilter->SetKernel(structuringElement);
+    dilateFilter->Update();
 
     writeImage(dilateFilter->GetOutput(), outputFile);
   }
