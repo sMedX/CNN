@@ -6,21 +6,22 @@ import itertools
 import sys
 import random
 
-classCount = '2'
+classCount = '3'
 cut = 'D:\\alex\\CNN-build\\utils\\Release\\CutImageByTiles.exe'
 makeTileLists = ['python.exe', 'make_sample_names_' + classCount + '-classes.py']
 train = 'C:\\caffe\\bin\\caffe_cc35.exe'
-clas = 'D:\\alex\\nets_pancreas\\caffe-win-1029\\bin\\class_new.exe'
+clas = 'D:/alex/caffe-ms/caffe-master/Build/x64/Release/caffe.exe'
 postproc = 'D:\\alex\\CNN-build\\postprocessing\\Release\\postprocessing.exe'
 valid = 'D:\\alex\\CNN-build\\validation\\Release\\Validation.exe'
 
 preset = 'livertumors'
-ver = '25'
+ver = '28'
 spacing = '0.782'
 spacingStr = 'orig' if spacing=='0' else spacing
+tilesParam = '-3class-3dircad'
 
 deviceId = '1'
-iters = '250000'
+iters = '45000'
 
 dir=os.path.join('C:/caffe', preset, ver)
 print dir
@@ -32,8 +33,8 @@ mask = 'liver.nrrd'
 patient = 'patient.nrrd'
   
 imagesPath = 'D:\\alex\\images'
-tilesFolder = os.path.join('D:\\alex\\tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr)
-samplesList = os.path.join(imagesPath, preset, 'samplesListGood.txt')
+tilesFolder = os.path.join('D:\\alex\\tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr + tilesParam)
+samplesList = os.path.join(imagesPath, preset, 'samplesList.txt')
 
 deploy = os.path.join('C:\\caffe', preset, ver, 'deploy.prototxt')
 start = [0, 0, 0]
@@ -60,37 +61,35 @@ def main():
     #    return
 
     # make lists
-    success = makeSampleNames2Classes(tilesFolder, dir, imagesPath,samplesList, n)
-    if not success:
-        print 'error. ', cut, ' exit with ', retcode
-        return
+    #success = makeSampleNames(int(classCount), tilesFolder, dir, imagesPath,samplesList, n)
+    #if not success:
+    #    print 'error. ', cut, ' exit with ', retcode
+    #    return
         
-    for k in range(2, n):
+    for k in range(0, n):
         kn = str(k) + '-' + str(n)
         # create folder for snapshots
-        snapshotFolder = os.path.join(snaphotPrefix, preset, ver, kn)
+        snapshotFolder = os.path.join(snaphotPrefix, preset, ver)###, kn)
         try:
             os.makedirs(snapshotFolder)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise e
             pass
-                
+
         model = os.path.join(snapshotFolder, '_iter_' + iters + '.caffemodel')
 
-    
         sampleTrainListK = os.path.join(dir, 'train-cv-' + kn + '.txt')
         sampleTestListK = os.path.join(dir, 'test-cv-' + kn + '.txt')
 
         tileTrainListK = os.path.join(dir, 'tileList-train-cv-' + kn + '.txt')
         tileTrainTestListK = os.path.join(dir, 'tileList-train-test-cv-' + kn + '.txt')
-        tileTestTest5050ListK = os.path.join(dir, 'tileList-test-test-50-50-cv-' + kn + '.txt')
         tileTestTestListK = os.path.join(dir, 'tileList-test-test-cv-' + kn + '.txt')
 
-        # make net and solver
-        solver = createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTest5050ListK, tileTestTestListK, iters, snapshotFolder)
-        
-        subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId], stdout = open('log'+kn+'.txt', 'w')) #not work on windows
+        #make net and solver
+        solver = createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTestListK, iters, snapshotFolder)
+        with open('log'+kn+'.txt', 'w') as log:
+            subprocess.call([train, 'train', '--solver', solver, '--gpu', deviceId], stdout = log, stderr = log)
 
         suffix = '-v' + ver + '-g' + groupX + 'x' + groupY + '-c' + classCount + '-s' + spacing + '-cv' + kn + '.nrrd'
         outputCNN = preset + '-cnn' + suffix
@@ -102,26 +101,25 @@ def main():
                 preset, spacing, batchLength, groupX, groupY, classCount, os.path.join(line, patient),
                 os.path.join(line, mask), os.path.join(line, outputCNN), deviceId]
                 print args
-                subprocess.call(args)
-        
-        #validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)          
+                #subprocess.call(args)
 
+        #validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)
+        
         with open(samplesList) as f:
             for line in f:
                 line = line.replace('\n','')
-                subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma, '-preset', preset])
+                #subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma, '-preset', preset])
         
         suffix = suffix + '-gaussian' + sigma + '.nrrd'
         outputCNN = preset + '-cnn' + suffix
 
-        validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)
+        #validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)
     return
 
-def makeSampleNames2Classes(pathTiles, pathOut, pathImages, samplesListFile, n):
+def makeSampleNames(classCount, pathTiles, pathOut, pathImages, samplesListFile, n):
     #numbers present for each class
     testTrainRate = 0.1
-    negPosRate = 3 # n negative for each positive sample
-    classCount = 2 #0 and 1
+    stride = [4, 1, 1]
     ###
     
     print 'pathTiles:', pathTiles
@@ -167,102 +165,81 @@ def makeSampleNames2Classes(pathTiles, pathOut, pathImages, samplesListFile, n):
                 trainDirs.extend(parts[i])
         print 'testDirs', testDirs
         print 'trainDirs', trainDirs
-        
-        with open(os.path.join(pathOut, 'test-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as sampleTestf:
+       
+        kn=str(k)+'-'+str(n)       
+        with open(os.path.join(pathOut, 'test-cv-'+kn+'.txt'), 'w') as sampleTestf:
             for dir in testDirs:
                 print >>sampleTestf, os.path.join(pathImages, preset, dir)
-        with open(os.path.join(pathOut, 'train-cv-'+str(k)+'-'+str(n)+'.txt'), 'w') as sampleTrainf:
+        with open(os.path.join(pathOut, 'train-cv-'+kn+'.txt'), 'w') as sampleTrainf:
             for dir in trainDirs:
                 print >>sampleTrainf, os.path.join(pathImages, preset, dir)
         
-        negPathTiles = []
-        posPathTiles = []
+        allPathTiles = []
+        list = []
+        count = []
+        allCount = 0
+        for i in range(0, classCount):
+            iPathTiles = [] #list of dirs for current class
+            for sample in trainDirs:
+                iPathTiles.append(os.path.join(pathTiles,sample,str(i)))
+            allPathTiles.append(iPathTiles)
         
-        for sample in trainDirs:
-            negPathTiles.append(os.path.join(pathTiles,sample,'0'))
-            posPathTiles.append(os.path.join(pathTiles,sample,'1'))
-        
-        posList = []
-        negList = []
-        
-        for path in posPathTiles:
-            for file in os.listdir(path):
-                posList.append(os.path.join(path,file))
-        for path in negPathTiles:
-            for file in os.listdir(path):
-                negList.append(os.path.join(path,file))
-
-        posCount = len(posList)
-        negCount = len(negList)
-        allCount = posCount + negCount
-        
-        print 'all:'+str(allCount)
-        print 'all pos:'+str(posCount)
-        print 'all neg:'+str(negCount)
-
-        posCount = min([int(allCount * 1 / (negPosRate + 1)), posCount])
-        negCount = min([int(allCount*negPosRate / (negPosRate + 1)), negCount])
-     
-        testCount = int(allCount * testTrainRate/classCount)
-        print 'testCount:'+str(testCount)
-        
-        if posCount < testCount or negCount < testCount:
-            print 'too few elements. Count must be at least more than testCount'
-            return False
-   
-        print 'used pos:'+str(posCount)
-        print 'used neg:'+str(negCount)
-
-        pos = random.sample(posList, posCount)
-        neg = random.sample(negList, negCount)
+            iList = [] #list of files for current class
+            for path in iPathTiles:
+                for file in os.listdir(path):
+                   iList.append(os.path.join(path,file))
+            list.append(iList)
+            
+            iCount = len(iList)
+            print 'class ', str(i), ' count: ', str(iCount)
+            iCount /= stride[i] 
+            print 'used only ', str(iCount)
+            count.append(iCount)
+            allCount += iCount
        
-        kn=str(k)+'-'+str(n)
-        #test on train
-        with open(os.path.join(pathOut, 'tileList-train-test-cv-'+kn+'.txt'), 'w') as testf:    
-            it = iter(neg[ : testCount])
-            for posfile in pos[ : testCount]:
-                negfile = next(it)    
-                print >>testf, posfile + ' 1'        
-                print >>testf, negfile + ' 0'
-        #train
-        with open(os.path.join(pathOut, 'tileList-train-cv-'+kn+'.txt'), 'w') as trainf:
-            it = iter(neg[testCount :])
-            for posfile in pos[testCount :]:
-                print >>trainf, posfile + ' 1'
-                for i in range(negPosRate):
-                    negfile = next(it)    
-                    print >>trainf, negfile + ' 0'
-        #test on test
-        print 'test: '+str(testCount*classCount)
-        negPathTiles = []
-        posPathTiles = []
+        print 'used summary count:', str(allCount)
+     
+        testCount = int(allCount * testTrainRate)
+        print 'testCount:', str(testCount)
+        iTestCount = testCount / classCount
         
-        for sample in testDirs:
-            negPathTiles.append(os.path.join(pathTiles,sample,'0'))
-            posPathTiles.append(os.path.join(pathTiles,sample,'1'))
-        
-        posList = []
-        negList = []
-        
-        for path in posPathTiles:
-            for file in os.listdir(path):
-                posList.append(os.path.join(path,file))
-        for path in negPathTiles:
-            for file in os.listdir(path):
-                negList.append(os.path.join(path,file))
+        for i in range(0, classCount):
+            if count[i] < iTestCount:
+                print 'too few elements in class ', str(i)
+                print 'Count must be more than iTestCount'
+                return False
+   
+            iSample = random.sample(list[i], count[i])
 
-        pos = random.sample(posList, min([testCount, len(posList)])) 
-        neg = random.sample(negList, min([testCount, len(negList)]))
+            #test on train
+            with open(os.path.join(pathOut, 'tileList-train-test-cv-'+kn+'.txt'), 'w') as testf:    
+                for iClassFile in iSample[ : iTestCount]:
+                    print >>testf, iClassFile + ' ' + str(i) 
+            #train
+            with open(os.path.join(pathOut, 'tileList-train-cv-'+kn+'.txt'), 'w') as trainf:
+                for iClassFile in iSample[iTestCount :]:
+                    print >>trainf, iClassFile  + ' ' + str(i)
+                    
+            #test on test
+            print 'test: '+str(iTestCount)
+            #testPathTiles = []
+            iPathTiles = []
         
-        print 'used test pos: ' + str(len(pos))
-        print 'used test neg: ' + str(len(neg))
+            for sample in testDirs:
+                iPathTiles.append(os.path.join(pathTiles,sample,str(i)))
         
-        with open(os.path.join(pathOut, 'tileList-test-test-cv-'+kn+'.txt'), 'w') as testf:
-            it = iter(neg[ : testCount])
-            for posfile in pos[ : testCount]:
-                negfile = next(it)    
-                print >>testf, posfile + ' 1'        
-                print >>testf, negfile + ' 0'
+            iList = []
+            for path in iPathTiles:
+                for file in os.listdir(path):
+                    iList.append(os.path.join(path,file))
+
+            iSample = random.sample(iList, min([iTestCount, len(iList)])) 
+            
+            print 'used test of ', str(i), ' class:' + str(len(iSample))
+            
+            with open(os.path.join(pathOut, 'tileList-test-test-cv-'+kn+'.txt'), 'w') as testf:
+                for iClassFile in iSample:
+                    print >>testf, iClassFile  + ' ' + str(i)
     return True
 
 def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
@@ -278,7 +255,7 @@ def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
                              '-report', 'report-cnn-test-'  + preset + '-'+ suffix + '.csv'])
     return valid
 
-def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTest5050ListK, tileTestTestListK, iters, snapshotFolder):
+def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTestListK, iters, snapshotFolder):
     netTemplate = os.path.join(dir, 'netTemplate.prototxt')
     net = os.path.join(dir, 'net-cv-' + kn + '.prototxt')
     fileData = None
@@ -287,7 +264,6 @@ def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTest5050L
     fileData = fileData \
         .replace('%trainTilesList%', tileTrainListK.replace('\\','/')) \
         .replace('%trainTestTilesList%', tileTrainTestListK.replace('\\','/')) \
-        .replace('%testTest50-50TilesList%', tileTestTest5050ListK.replace('\\','/')) \
         .replace('%testTestTilesList%', tileTestTestListK.replace('\\','/'))
 
     with open(net, 'w') as file:
