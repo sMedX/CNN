@@ -61,10 +61,10 @@ def main():
     #    return
 
     # make lists
-    #success = makeSampleNames(int(classCount), tilesFolder, dir, imagesPath,samplesList, n)
-    #if not success:
-    #    print 'error. ', cut, ' exit with ', retcode
-    #    return
+    success = makeSampleNames(int(classCount), tilesFolder, dir, imagesPath,samplesList, n)
+    if not success:
+        print 'error. ', cut, ' exit with ', retcode
+        return
         
     for k in range(0, n):
         kn = str(k) + '-' + str(n)
