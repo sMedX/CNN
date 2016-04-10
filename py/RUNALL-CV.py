@@ -203,43 +203,44 @@ def makeSampleNames(classCount, pathTiles, pathOut, pathImages, samplesListFile,
         print 'testCount:', str(testCount)
         iTestCount = testCount / classCount
         
-        for i in range(0, classCount):
-            if count[i] < iTestCount:
-                print 'too few elements in class ', str(i)
-                print 'Count must be more than iTestCount'
-                return False
-   
-            iSample = random.sample(list[i], count[i])
+        
+        with open(os.path.join(pathOut, 'tileList-train-test-cv-'+kn+'.txt'), 'w') as testTrainF:
+            with open(os.path.join(pathOut, 'tileList-train-cv-'+kn+'.txt'), 'w') as trainF:
+                with open(os.path.join(pathOut, 'tileList-test-test-cv-'+kn+'.txt'), 'w') as testTestF:            
+                    for i in range(0, classCount):
+                        if count[i] < iTestCount:
+                            print 'too few elements in class ', str(i)
+                            print 'Count must be more than iTestCount'
+                            return False
+               
+                        iSample = random.sample(list[i], count[i])
 
-            #test on train
-            with open(os.path.join(pathOut, 'tileList-train-test-cv-'+kn+'.txt'), 'w') as testf:    
-                for iClassFile in iSample[ : iTestCount]:
-                    print >>testf, iClassFile + ' ' + str(i) 
-            #train
-            with open(os.path.join(pathOut, 'tileList-train-cv-'+kn+'.txt'), 'w') as trainf:
-                for iClassFile in iSample[iTestCount :]:
-                    print >>trainf, iClassFile  + ' ' + str(i)
+                        #test on train  
+                        for iClassFile in iSample[ : iTestCount]:
+                            print >>testTrainF, iClassFile + ' ' + str(i) 
+                        #train
+                        for iClassFile in iSample[iTestCount :]:
+                            print >>trainF, iClassFile  + ' ' + str(i)
+                                
+                        #test on test
+                        print 'test: '+str(iTestCount)
+                        #testPathTiles = []
+                        iPathTiles = []
                     
-            #test on test
-            print 'test: '+str(iTestCount)
-            #testPathTiles = []
-            iPathTiles = []
-        
-            for sample in testDirs:
-                iPathTiles.append(os.path.join(pathTiles,sample,str(i)))
-        
-            iList = []
-            for path in iPathTiles:
-                for file in os.listdir(path):
-                    iList.append(os.path.join(path,file))
+                        for sample in testDirs:
+                            iPathTiles.append(os.path.join(pathTiles,sample,str(i)))
+                    
+                        iList = []
+                        for path in iPathTiles:
+                            for file in os.listdir(path):
+                                iList.append(os.path.join(path,file))
 
-            iSample = random.sample(iList, min([iTestCount, len(iList)])) 
-            
-            print 'used test of ', str(i), ' class:' + str(len(iSample))
-            
-            with open(os.path.join(pathOut, 'tileList-test-test-cv-'+kn+'.txt'), 'w') as testf:
-                for iClassFile in iSample:
-                    print >>testf, iClassFile  + ' ' + str(i)
+                        iSample = random.sample(iList, min([iTestCount, len(iList)])) 
+                        
+                        print 'used test of ', str(i), ' class:' + str(len(iSample))
+                        
+                        for iClassFile in iSample:
+                            print >>testTestF, iClassFile  + ' ' + str(i)
     return True
 
 def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
