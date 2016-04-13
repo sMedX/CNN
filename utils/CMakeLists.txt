@@ -34,3 +34,9 @@ set(SOURCES "cutImageBySlices.cpp" "preprocess.h")
 add_executable(cutImageBySlices ${SOURCES})
 
 TARGET_LINK_LIBRARIES(cutImageBySlices ${LIBRARIES} )
+#
+set(SOURCES "resampleMask.cpp" "preprocess.h")
+
+add_executable(resampleMask ${SOURCES})
+
+TARGET_LINK_LIBRARIES(resampleMask ${LIBRARIES} )

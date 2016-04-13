@@ -9,12 +9,11 @@
 #include <itkImage.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
-#include <itkMinimumMaximumImageCalculator.h>
-#include "itkBinaryDilateImageFilter.h"
 
 #include "agtkTypes.h"
 #include "agtkIO.h"
 #include "agtkCommandLineArgumentParser.h"
+#include <agtkResampling.h>
 
 int main(int argc, char* argv[])
 {
@@ -38,12 +37,12 @@ int main(int argc, char* argv[])
   std::string listFile;
   parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
 
-  int radius; // for padding
-  parser->GetValue("-radius", radius);
+  float spacing; // for padding
+  parser->GetValue("-radius", spacing);
 
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "maskName  " << maskName << std::endl;
-  std::cout << "radius " << radius << std::endl;
+  std::cout << "spacing " << spacing << std::endl;
 
   std::vector<std::string> inputDirs;
 
@@ -62,7 +61,7 @@ int main(int argc, char* argv[])
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
     auto inputDir = inputDirs[iImage];
     auto maskFile = inputDir + "/" + maskName;
-    auto outputFile = inputDir + "/" + maskName + "-dilate-r" + std::to_string(radius) + ".nrrd";
+    auto outputFile = inputDir + "/" + maskName + "-s" + std::to_string(spacing) + ".nrrd";
 
     std::cout << "maskFile " << maskFile << std::endl;
 
@@ -74,28 +73,13 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    typedef itk::MinimumMaximumImageCalculator <BinaryImage3D> ImageCalculatorFilterType;
-    ImageCalculatorFilterType::Pointer imageCalculatorFilter = ImageCalculatorFilterType::New();
-    imageCalculatorFilter->SetImage(mask);
-    imageCalculatorFilter->ComputeMaximum();
+    agtk::Image3DSpacing spacing3D;
+    spacing3D[0] = spacing;
+    spacing3D[1] = spacing;
+    spacing3D[2] = mask->GetSpacing()[2];
 
-    typedef itk::BinaryBallStructuringElement<BinaryImage3D::PixelType, BinaryImage3D::ImageDimension> StructuringElementType;
-    StructuringElementType structuringElement;
-    StructuringElementType::SizeType radius3D = { radius, radius, radius * mask->GetSpacing()[0] / mask->GetSpacing()[2] };
-    std::cout << "radius 3d: " << radius3D << std::endl;
-
-    structuringElement.SetRadius(radius3D);
-    structuringElement.CreateStructuringElement();
-
-    typedef itk::BinaryDilateImageFilter <BinaryImage3D, BinaryImage3D, StructuringElementType> BinaryDilateImageFilterType;
-
-    BinaryDilateImageFilterType::Pointer dilateFilter = BinaryDilateImageFilterType::New();
-    dilateFilter->SetInput(mask);
-    dilateFilter->SetDilateValue(imageCalculatorFilter->GetMaximum());
-    dilateFilter->SetKernel(structuringElement);
-    dilateFilter->Update();
-
-    writeImage(dilateFilter->GetOutput(), outputFile);
+    mask = resamplingBinary(mask.GetPointer(), spacing3D);
+    writeImage(mask, outputFile);
   }
   return EXIT_SUCCESS;
 };

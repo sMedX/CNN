@@ -6,12 +6,12 @@ from os import path
 # params
 ver='2'
 preset='liver'
-sampleListName='test-cv-3-4.txt'
+sampleListName='train-cv-3-4.txt'
 spacing='1.5'
-classCount='3'
+classCount='2'
 mask = preset+'.nrrd-dilate-r64.nrrd'
 sigma='4.000000' #format is important for cpp code
-forceOverwrite = False
+forceOverwrite = True
 kn='3-4'
 
 #dir='D:/alex/images'
@@ -39,7 +39,7 @@ outFile = open('VOEByIters-'+preset+suffix+'-'+sampleListName.replace('.txt','')
 
 outFile.write('iter; avg VOE class; avg VOE largest Object, avg VOE Smoothed;\n')
 
-for iter in range(5000,80000,5000):
+for iter in range(45000,5000,-5000):
     print iter
     snapshotFolder = os.path.join(snapshotPrefix, preset, ver, kn)
     model = os.path.join(snapshotFolder, '_iter_' + str(iter) + '.caffemodel')

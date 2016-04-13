@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
   std::cout << "preset " << preset << std::endl;
   std::vector<std::string> inputDirs;
 
-  ifstream infile(listFile);
+  std::ifstream infile(listFile);
   std::string line;
 
   while (std::getline(infile, line)) {
@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
     double spacingXY = image16->GetSpacing()[0] * (static_cast<double>(inputSize[0]) / outputSize);
 
     std::cout << "preprocess image" << std::endl;
-    auto image8 = smartCastImage(preset, image16);
+    auto image8 = smartCastImage(preset, image16, nullptr);
 
     for (size_t z = 0; z < image16->GetLargestPossibleRegion().GetSize(2); z++) {
       auto sliceImage = exctractSlice(image8.GetPointer(), z);

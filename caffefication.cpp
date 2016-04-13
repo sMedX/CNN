@@ -1,92 +1,27 @@
-#include <cuda_runtime.h>
+// caffefication.cpp : Defines the exported functions for the DLL application.
 
-#include <cstring>
-#include <cstdlib>
-#include <vector>
-#include <string>
+//#include <cstring>
+//#include <cstdlib>
+//#include <vector>
 #include <iostream>
 
 // ITK
 #include <itkImage.h>
-#include <itkImageFileReader.h>
-#include <itkImageFileWriter.h>
-#include <itkMetaImageIOFactory.h>
-#include <itkNrrdImageIOFactory.h>
 
-#include "caffe/caffe.hpp"
-#include "caffe/blob.hpp"
+#include <caffe/caffe.hpp>
+#include <caffe/blob.hpp>
 
-#define NO_VTK
-#include "agtkResampling.h"
+#include <agtkResampling.h>
 
 #include "preprocess.h"
+#include "caffefication.h"
 
-bool writeImage(const std::string& outputFile, const BinaryImage3D::Pointer& outImage)
-{
-  typedef itk::ImageFileWriter<BinaryImage3D>  writerType;
-  writerType::Pointer writer = writerType::New();
-  writer->SetFileName(outputFile);
-  writer->SetInput(outImage);
-  try {
-    writer->Update();
-  } catch (itk::ExceptionObject &excp) {
-    std::cout << "Exception thrown while writing " << std::endl;
-    std::cout << excp << std::endl;
-    return false;
-  }
-  return true;
-}
-
-bool classify(caffe::Net<float>& caffeNet, std::string& preset, std::string& input_file, std::string& mask_file, Image3DRegion& region, int radiusXY, float spacingXY, int batchLength, int groupX, int groupY, int classCount, bool isRgb, BinaryImage3D::Pointer& outImage, int& retCode)
+int classify(caffe::Net<float>* caffeNet, std::string& preset, Int16Image3D::Pointer image16, UInt8Image3D::Pointer imageMask, Image3DRegion& region,
+  int radiusXY, float spacingXY, int batchLength, int groupX, int groupY, int classCount, bool isRgb, OUT BinaryImage3D::Pointer& outImage)
 {
   if (classCount < 1 && classCount > 3) {
     std::cout << "classCount must be 1, 2, 3 or 4";
   }
-
-  std::cout << "load images" << std::endl;
-
-  itk::MetaImageIOFactory::RegisterOneFactory();
-  itk::NrrdImageIOFactory::RegisterOneFactory();
-  std::cout << "nrrd factory registered" << std::endl;
-
-  typedef std::list<itk::LightObject::Pointer> RegisteredObjectsContainerType;
-  RegisteredObjectsContainerType registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
-  std::cout << "there are " << registeredIOs.size() << " IO objects available to the ImageFileReader." << std::endl;
-
-  typedef itk::ImageFileReader<Int16Image3D> ReaderType;
-  typedef itk::ImageFileReader<BinaryImage3D> BinaryReaderType;
-
-  ReaderType::Pointer reader = ReaderType::New();
-  reader->SetFileName(input_file);
-  try {
-    reader->Update();
-  } catch (itk::ExceptionObject &excp) {
-    std::cout << "Exception thrown while reading the image " << std::endl;
-    std::cout << excp << std::endl;
-    retCode = EXIT_FAILURE;
-    return true;
-  }
-  std::cout << "." << std::endl;
-
-  BinaryImage3D::Pointer imageMask;
-  if (mask_file == "BOUNDING_BOX") {
-    imageMask = nullptr;
-  } else {
-    BinaryReaderType::Pointer readerMask = BinaryReaderType::New();
-    readerMask->SetFileName(mask_file);
-    try {
-      readerMask->Update();
-    } catch (itk::ExceptionObject &excp) {
-      std::cout << "Exception thrown while reading the mask " << std::endl;
-      std::cout << excp << std::endl;
-      retCode = EXIT_FAILURE;
-      return true;
-    }
-    imageMask = readerMask->GetOutput();
-  }
-  std::cout << "." << std::endl;
-
-  Int16Image3D::Pointer image16 = reader->GetOutput();
 
   UInt8Image3D::Pointer image8 = UInt8Image3D::New();
   UInt8Image3D::Pointer imageNull = nullptr;
@@ -102,8 +37,7 @@ bool classify(caffe::Net<float>& caffeNet, std::string& preset, std::string& inp
   if (imageMask != nullptr) {
     if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
       std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
-      retCode = EXIT_FAILURE;
-      return true;
+      return false;
     }
   }
 
@@ -240,7 +174,7 @@ bool classify(caffe::Net<float>& caffeNet, std::string& preset, std::string& inp
 
     auto time1 = clock();
 
-    auto results = caffeNet.Forward(bottom, &type)[0]->cpu_data();
+    auto results = caffeNet->Forward(bottom, &type)[0]->cpu_data();
     delete blob;
 
     auto time2 = clock();
@@ -248,33 +182,19 @@ bool classify(caffe::Net<float>& caffeNet, std::string& preset, std::string& inp
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       auto& index = indices[i*batchLength + iTile];
 
-      float max = 0;
-      int max_i = 0;
-      for (int j = 0; j < classCount; ++j) {
-        float value = results[classCount*iTile + j];
-        if (value > max) {
-          max = value;
-          max_i = j;
-        }
-      }
-
-      int val = 0;
+      int val = results[classCount*iTile];
 
       if (classCount == 4) {
         const int TP = 2, FN = 3; // there are labels from last classificatoin onto 2 classes
 
-        if (max_i == TP || max_i == FN) { // TP,FN -> true, TN,FP ->false
+        if (val == TP || val == FN) { // TP,FN -> true, TN,FP ->false
           val = 1;
           posCount++;
+        } else {
+          val = 0;
         }
-      } else if (classCount == 3) { // there are background, tumors, singularity in tumors
-        if (max_i != 0) {
-          val = 1;
-          posCount++;
-        }
-      } else {// if classCount == 2
-        if (max_i == 1) {
-          val = 1;
+      } else {
+        if (val != 0) {
           posCount++;
         }
       }
@@ -299,114 +219,24 @@ bool classify(caffe::Net<float>& caffeNet, std::string& preset, std::string& inp
   }
 
   std::cout << "positives:" << posCount << std::endl;
- 
+
   //postprocess
   //resampling back
-  if (spacingXY != 0) { //resample image by axial slices
-    std::cout << "resample" << std::endl;
-    outImage = resamplingLike(outImage.GetPointer(), image16.GetPointer());
-  }
-  return false;
+  //if (spacingXY != 0) { //resample image by axial slices
+  //  std::cout << "resample" << std::endl;
+  //  outImage = resamplingLike(outImage.GetPointer(), image16.GetPointer());
+  //}
+  return true;
 }
 
-void loadNet(std::string& modelFile, std::string trainedFile, int deviceId, OUT caffe::Net<float>& caffeNet)
+void loadNet(std::string& modelFile, std::string trainedFile, int deviceId, OUT std::shared_ptr<caffe::Net<float>>& caffeNet)
 {
   caffe::Caffe::set_mode(caffe::Caffe::GPU);
   caffe::Caffe::SetDevice(deviceId);
 
   std::cout << "create net" << std::endl;
-  caffeNet = caffe::Net<float>(modelFile, caffe::TEST);
-
+  caffeNet = std::make_shared<caffe::Net<float>>(modelFile, caffe::TEST);
   std::cout << "load net's weights" << std::endl;
-  caffeNet.CopyTrainedLayersFrom(trainedFile);
+  caffeNet->CopyTrainedLayersFrom(trainedFile);
 }
 
-int main(int argc, char** argv)
-{
-  using namespace caffe;
-  using namespace agtk;
-
-  string modelFile = argv[1];
-  string trainedFile = argv[2];
-
-  string startXStr = argv[3];
-  string startYStr = argv[4];
-  string startZStr = argv[5];
-
-  string sizeXStr = argv[6];
-  string sizeYStr = argv[7];
-  string sizeZStr = argv[8];
-
-  string radiusXYStr = argv[9];
-  string preset = argv[10];
-  string spacingXYStr = argv[11];
-
-  string batchLengthStr = argv[12];
-
-  string groupXStr = argv[13]; // interpret an area XxY as 1 unit
-  string groupYStr = argv[14];
-
-  string classCountStr = argv[15];
-
-  string inputFile = argv[16];
-  string maskFile = argv[17];
-  string outputFile = argv[18];
-
-  string deviceIdStr = argv[19];
-
-  Image3DIndex start;
-  start[0] = atoi(startXStr.c_str());
-  start[1] = atoi(startYStr.c_str());
-  start[2] = atoi(startZStr.c_str());
-
-  Image3DSize size;
-  size[0] = atoi(sizeXStr.c_str());
-  size[1] = atoi(sizeYStr.c_str());
-  size[2] = atoi(sizeZStr.c_str());
-
-  Image3DRegion region;
-  region.SetIndex(start);
-  region.SetSize(size);
-
-  int radiusXY = atoi(radiusXYStr.c_str());
-  float spacingXY = atof(spacingXYStr.c_str());
-  int batchLength = atoi(batchLengthStr.c_str());
-  int groupX = atoi(groupXStr.c_str());
-  int groupY = atoi(groupYStr.c_str());
-  int classCount = atoi(classCountStr.c_str());
-  int deviceId = atoi(deviceIdStr.c_str());
-  bool isRgb = false; //TODO
-
-  std::cout << "modelFile = " << modelFile << std::endl <<
-    "trainedFile =" << trainedFile << std::endl <<
-    "region = " << region << std::endl <<
-    "radiusXY=" << radiusXY << std::endl <<
-    "preset=" << preset << std::endl <<
-    "spacingXY=" << spacingXY << std::endl <<
-    "batchSize=" << batchLength << std::endl <<
-    "groupX=" << groupX << std::endl <<
-    "groupY=" << groupY << std::endl <<
-    "classCount=" << classCount << std::endl <<
-    "inputFile = " << inputFile << std::endl <<
-    "maskFile =" << maskFile << std::endl <<
-    "outputFile =" << outputFile << std::endl <<
-    "deviceID =" << deviceId << std::endl;
-
-  //Setting CPU or GPU
-  caffe::Net<float> caffeNet;
-  loadNet(modelFile, trainedFile, deviceId, caffeNet);
-
-  BinaryImage3D::Pointer outImage;
-  int retCode;
-
-  classify(caffeNet, preset, inputFile, maskFile, region, radiusXY, spacingXY, batchLength, groupX, groupY, classCount, isRgb, outImage, retCode);
-  if (retCode == EXIT_FAILURE) {
-    return retCode;
-  }
-
-  std::cout << "save" << std::endl;
-  if (!writeImage(outputFile, outImage)) {
-    return EXIT_FAILURE;
-  }
-  return EXIT_SUCCESS;
-}

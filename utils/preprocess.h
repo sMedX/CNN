@@ -1,6 +1,6 @@
 #include <itkConstantPadImageFilter.h>
 
-#include "agtkAdaptiveHistogramEqualizationImageFilter.h"
+//#include "agtkAdaptiveHistogramEqualizationImageFilter.h"
 #include "agtkResampling.h"
 
 namespace
@@ -24,7 +24,7 @@ namespace
   }
 
   // Performs preprocessing with casting to uint8
-  UInt8Image3D::Pointer smartCastImage(std::string& preset, Int16Image3D::Pointer& image16, BinaryImage3D::Pointer& mask)
+  UInt8Image3D::Pointer smartCastImage(std::string& preset, Int16Image3D* image16, BinaryImage3D* mask)
   {
     std::cout << "shift, sqeeze" << std::endl;
 
@@ -46,26 +46,26 @@ namespace
         it.Set(it.Get() + shift);
       }
 
-      int radius = 5;
-      float alpha = 0.3;
-      float beta = 0.3;
-      int lut = 0;
-      float outsideValue = 0;
+      //int radius = 5;
+      //float alpha = 0.3;
+      //float beta = 0.3;
+      //int lut = 0;
+      //float outsideValue = 0;
 
-      std::vector<float> range = { 0, 255 };
-      typedef agtk::AdaptiveHistogramEqualizationImageFilter <Int16Image3D> AdaptiveHistogramEqualizationImageFilterType;
-      AdaptiveHistogramEqualizationImageFilterType::Pointer equalize = AdaptiveHistogramEqualizationImageFilterType::New();
-      equalize->SetRadius(radius);
-      equalize->SetAlpha(alpha);
-      equalize->SetBeta(beta);
-      equalize->SetOutsideValue(outsideValue);
-      equalize->SetUseLookupTable(lut);
-      equalize->SetShiftDynamicRange(range[0], range[1]);
-      equalize->SetMask(mask);
-      equalize->SetInput(image16);
-      equalize->Update();
-      equalize->Print(std::cout);
-      image16 = equalize->GetOutput();
+      //std::vector<float> range = { 0, 255 };
+      //typedef agtk::AdaptiveHistogramEqualizationImageFilter <Int16Image3D> AdaptiveHistogramEqualizationImageFilterType;
+      //AdaptiveHistogramEqualizationImageFilterType::Pointer equalize = AdaptiveHistogramEqualizationImageFilterType::New();
+      //equalize->SetRadius(radius);
+      //equalize->SetAlpha(alpha);
+      //equalize->SetBeta(beta);
+      //equalize->SetOutsideValue(outsideValue);
+      //equalize->SetUseLookupTable(lut);
+      //equalize->SetShiftDynamicRange(range[0], range[1]);
+      //equalize->SetMask(mask);
+      //equalize->SetInput(image16);
+      //equalize->Update();
+      //equalize->Print(std::cout);
+      //image16 = equalize->GetOutput();
     }
     std::cout << "cast (truncate)" << std::endl;
     // force integer overflow

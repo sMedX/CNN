@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
   }
   std::vector<std::string> inputDirs;
 
-  ifstream infile(listFile);
+  std::ifstream infile(listFile);
   std::string line;
 
   while (std::getline(infile, line)) {
