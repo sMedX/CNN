@@ -24,7 +24,7 @@ namespace
   }
 
   // Performs preprocessing with casting to uint8
-  UInt8Image3D::Pointer smartCastImage(std::string& preset, Int16Image3D* image16, BinaryImage3D* mask)
+  UInt8Image3D::Pointer smartCastImage(const std::string& preset, Int16Image3D* image16, BinaryImage3D* mask)
   {
     std::cout << "shift, sqeeze" << std::endl;
 
@@ -34,6 +34,7 @@ namespace
 
       // x' = (x + shift)/squeeze
       itk::ImageRegionIterator<Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
+
       for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
         it.Set((it.Get() + shift) / squeeze);
       }
@@ -42,30 +43,10 @@ namespace
 
       // x' = x + shift
       itk::ImageRegionIterator<Int16Image3D> it(image16, image16->GetLargestPossibleRegion());
+      
       for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
         it.Set(it.Get() + shift);
       }
-
-      //int radius = 5;
-      //float alpha = 0.3;
-      //float beta = 0.3;
-      //int lut = 0;
-      //float outsideValue = 0;
-
-      //std::vector<float> range = { 0, 255 };
-      //typedef agtk::AdaptiveHistogramEqualizationImageFilter <Int16Image3D> AdaptiveHistogramEqualizationImageFilterType;
-      //AdaptiveHistogramEqualizationImageFilterType::Pointer equalize = AdaptiveHistogramEqualizationImageFilterType::New();
-      //equalize->SetRadius(radius);
-      //equalize->SetAlpha(alpha);
-      //equalize->SetBeta(beta);
-      //equalize->SetOutsideValue(outsideValue);
-      //equalize->SetUseLookupTable(lut);
-      //equalize->SetShiftDynamicRange(range[0], range[1]);
-      //equalize->SetMask(mask);
-      //equalize->SetInput(image16);
-      //equalize->Update();
-      //equalize->Print(std::cout);
-      //image16 = equalize->GetOutput();
     }
     std::cout << "cast (truncate)" << std::endl;
     // force integer overflow
@@ -90,7 +71,7 @@ namespace
   }
 
   // Performs preprocessing befory cutting by tiles
-  void preprocess(int radius, std::string& IN preset, float spacingXY, bool isRgb, Int16Image3D::Pointer& IN image16,
+  void preprocess(int radius, const std::string& IN preset, float spacingXY, bool isRgb, Int16Image3D::Pointer& IN image16,
     UInt8Image3D::Pointer& IN OUT label1, UInt8Image3D::Pointer&IN OUT label2, UInt8Image3D::Pointer& IN OUT mask, UInt8Image3D::Pointer& IN OUT adaptive,
     UInt8Image3D::Pointer& OUT image)
   {

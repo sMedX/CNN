@@ -48,10 +48,9 @@ find_package(AGTK)
 include(${AGTK_USE_FILE})
 
 list(APPEND LIBRARIES ${AGTK_LIBRARIES})
-list(REMOVE_ITEM LIBRARIES "ITKVideoBridgeOpenCV")
+#list(REMOVE_ITEM LIBRARIES "ITKVideoBridgeOpenCV")
 #list(REMOVE_ITEM LIBRARIES "ITKVtkGlue")
-message(STATUS "AGTK_LIBRARIES")
-message(STATUS ${AGTK_LIBRARIES})
+message(STATUS "AGTK_LIBRARIES ${AGTK_LIBRARIES}")
 
 include_directories(${AGTK_INCLUDE_DIRS})
 
@@ -64,25 +63,19 @@ include_directories(${Caffe_INCLUDE_DIRS})
 add_definitions(${Caffe_DEFINITIONS})
 list(APPEND LIBRARIES ${Caffe_LIBRARIES})
 
-message(STATUS "Caffe_DEFINITIONS")
-message(STATUS ${Caffe_DEFINITIONS})
-
-message(STATUS "Caffe_INCLUDE_DIRS")
-message(STATUS ${Caffe_INCLUDE_DIRS})
-
-message(STATUS "Caffe_LIBRARIES")
-message(STATUS ${Caffe_LIBRARIES})
-
-message(STATUS "Caffe_LINKER_LIBS")
-message(STATUS ${Caffe_LINKER_LIBS})
+message(STATUS "Caffe_DEFINITIONS ${Caffe_DEFINITIONS}")
+message(STATUS "Caffe_INCLUDE_DIRS ${Caffe_INCLUDE_DIRS}")
+message(STATUS "Caffe_LIBRARIES ${Caffe_LIBRARIES}")
+message(STATUS "Caffe_LINKER_LIBS ${Caffe_LINKER_LIBS}")
 
 add_subdirectory(classification)
-
 add_subdirectory(validation)
 add_subdirectory(postprocessing)
 add_subdirectory(utils)
 
 #list(APPEND LIBRARIES "D:/alex/caffe-ms/NugetPackages/hdf5-v120-complete.1.8.15.2/lib/native/lib/x64/hdf5_hl.lib") #todo
+list(APPEND LIBRARIES "C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl.lib;C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl_cpp.lib;") #todo
+#TODO gdcm lib from itk
 
 set(SOURCES "caffefication.cpp" "caffefication.h")
 include_directories("utils")

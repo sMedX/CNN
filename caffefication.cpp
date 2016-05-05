@@ -1,8 +1,7 @@
-// caffefication.cpp : Defines the exported functions for the DLL application.
+// caffefication.cpp : Defines the exported functions for the DLL.
 
 //#include <cstring>
 //#include <cstdlib>
-//#include <vector>
 #include <iostream>
 
 // ITK
@@ -16,8 +15,9 @@
 #include "preprocess.h"
 #include "caffefication.h"
 
-int classify(caffe::Net<float>* caffeNet, std::string& preset, Int16Image3D::Pointer image16, UInt8Image3D::Pointer imageMask, Image3DRegion& region,
-  int radiusXY, float spacingXY, int batchLength, int groupX, int groupY, int classCount, bool isRgb, OUT BinaryImage3D::Pointer& outImage)
+bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
+  UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radiusXY, float spacingXY, int batchLength, int groupX,
+  int groupY, int classCount, bool isRgb, OUT BinaryImage3D::Pointer& outImage)
 {
   if (classCount < 1 && classCount > 3) {
     std::cout << "classCount must be 1, 2, 3 or 4";
@@ -182,7 +182,7 @@ int classify(caffe::Net<float>* caffeNet, std::string& preset, Int16Image3D::Poi
     for (int iTile = 0; iTile < batchLength; ++iTile) {
       auto& index = indices[i*batchLength + iTile];
 
-      int val = results[classCount*iTile];
+      int val = results[iTile];
 
       if (classCount == 4) {
         const int TP = 2, FN = 3; // there are labels from last classificatoin onto 2 classes
@@ -222,14 +222,25 @@ int classify(caffe::Net<float>* caffeNet, std::string& preset, Int16Image3D::Poi
 
   //postprocess
   //resampling back
-  //if (spacingXY != 0) { //resample image by axial slices
-  //  std::cout << "resample" << std::endl;
-  //  outImage = resamplingLike(outImage.GetPointer(), image16.GetPointer());
-  //}
+  if (spacingXY != 0) { //resample image by axial slices
+    std::cout << "resample" << std::endl;
+    typedef itk::ResampleImageFilter<BinaryImage3D, Int16Image3D> ResampleImageFilterType;
+
+    auto nn_interpolator = itk::NearestNeighborInterpolateImageFunction<BinaryImage3D>::New();
+
+    auto resampleFilter = ResampleImageFilterType::New();
+    resampleFilter->SetInput(outImage);
+    resampleFilter->SetReferenceImage(image16);
+    resampleFilter->SetUseReferenceImage(true);
+    resampleFilter->SetInterpolator(nn_interpolator);
+    resampleFilter->SetDefaultPixelValue(0);
+    resampleFilter->UpdateLargestPossibleRegion();
+    outImage->Graft(resampleFilter->GetOutput());
+  }
   return true;
 }
 
-void loadNet(std::string& modelFile, std::string trainedFile, int deviceId, OUT std::shared_ptr<caffe::Net<float>>& caffeNet)
+void loadNet(const std::string& modelFile, const std::string& trainedFile, int deviceId, OUT std::shared_ptr<caffe::Net<float>>& caffeNet)
 {
   caffe::Caffe::set_mode(caffe::Caffe::GPU);
   caffe::Caffe::SetDevice(deviceId);

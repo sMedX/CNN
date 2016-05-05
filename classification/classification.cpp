@@ -18,7 +18,9 @@
 
 #include "D:\alex\CNN\caffefication.h" //TODO
 
-bool writeImage(const std::string& outputFile, const agtk::BinaryImage3D::Pointer& outImage)
+//#define RUNTIME_CAFFEFICATION
+
+bool writeImage(const std::string& outputFile, const BinaryImage3D::Pointer& outImage)
 {
   typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
   writerType::Pointer writer = writerType::New();
@@ -105,10 +107,37 @@ int main(int argc, char** argv)
     "outputFile =" << outputFile << std::endl <<
     "deviceID =" << deviceId << std::endl;
 
-  //Setting CPU or GPU
-  std::shared_ptr<caffe::Net<float>> caffeNet;
-  loadNet(modelFile, trainedFile, deviceId, caffeNet);
 
+#ifdef RUNTIME_CAFFEFICATION // just for test/debug
+  auto m_Dll = LoadLibrary("D:/alex/CNN-build4/Release/caffefication.dll");
+
+  // Check to see if the library was loaded successfully 
+  if (!m_Dll) {
+    printf("library failed to load!\n");
+    return EXIT_FAILURE;
+  }
+
+  //declare a variable of type pointer to EntryPoint function, a name of 
+  // which you will later use instead of EntryPoint
+  auto loadNetStr = "loadNet";
+  loadNetFuncPtr loadNetFunc = reinterpret_cast<loadNetFuncPtr>(GetProcAddress(m_Dll, loadNetStr));
+  if (!loadNetFunc) {
+    std::cout << "no function " << loadNetStr << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  auto classifyStr = "classify";
+  auto m_ClassifyFunc = reinterpret_cast<classifyFuncPtr>(GetProcAddress(m_Dll, classifyStr));
+  if (!m_ClassifyFunc) {
+    std::cout << "no function " << classifyStr << std::endl;
+    return EXIT_FAILURE;
+  }
+#define classify m_ClassifyFunc
+#define loadNet loadNetFunc
+#endif 
+  std::shared_ptr<caffe::Net<float>> caffeNet;
+  //Setting CPU or GPU
+  loadNet(modelFile, trainedFile, deviceId, caffeNet);
   std::cout << "load images" << std::endl;
 
   itk::MetaImageIOFactory::RegisterOneFactory();
@@ -153,7 +182,9 @@ int main(int argc, char** argv)
   Int16Image3D::Pointer image16 = reader->GetOutput();
 
   BinaryImage3D::Pointer outImage;
+
   int success = classify(caffeNet.get(), preset, image16, imageMask, region, radiusXY, spacingXY, batchLength, groupX, groupY, classCount, isRgb, outImage);
+
   if (!success) {
     return EXIT_FAILURE;
   }

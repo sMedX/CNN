@@ -1,14 +1,14 @@
 #ifdef caffefication_EXPORTS
-#  define CAFFEFICATION_EXPORT /*extern "C"*/ __declspec(dllexport)
+#  define CAFFEFICATION_EXPORT  __declspec(dllexport)
 #else
-#  define CAFFEFICATION_EXPORT __declspec(dllimport)     //TODO
+#  define CAFFEFICATION_EXPORT
 #endif
 
-#define DECLARE_RUNTIME_FUNCTION(ret, name, params)\
+#define DECLARE_DLL_FUNCTION(ret, name, params)\
   CAFFEFICATION_EXPORT ret name params;\
   typedef ret(*name##FuncPtr)params;
 
-#include <itkImage.h>           
+#include <itkImage.h>
 
 #include <agtkTypes.h>
 
@@ -21,8 +21,8 @@ namespace caffe
 
 using namespace agtk;
 
-DECLARE_RUNTIME_FUNCTION(int, classify, (caffe::Net<float>* caffeNet, std::string& preset, Int16Image3D::Pointer image16,
+extern "C" DECLARE_DLL_FUNCTION(bool, classify, (caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
   UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radiusXY, float spacingXY, int batchLength, int groupX,
   int groupY, int classCount, bool isRgb, OUT BinaryImage3D::Pointer& outImage))
 
-DECLARE_RUNTIME_FUNCTION(void, loadNet, (std::string& modelFile, std::string trainedFile, int deviceId, OUT std::shared_ptr<caffe::Net<float>>& caffeNet))
+extern "C" DECLARE_DLL_FUNCTION(void, loadNet, (const std::string& modelFile, const std::string& trainedFile, int deviceId, std::shared_ptr<caffe::Net<float>>& caffeNet))
