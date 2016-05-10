@@ -15,6 +15,7 @@
 #include "preprocess.h"
 #include "caffefication.h"
 
+namespace caffefication {
 bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
   UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radiusXY, float spacingXY, int batchLength, int groupX,
   int groupY, int classCount, bool isRgb, OUT BinaryImage3D::Pointer& outImage)
@@ -258,4 +259,4 @@ void loadNet(const std::string& modelFile, const std::string& trainedFile, int d
   std::cout << "load net's weights" << std::endl;
   caffeNet->CopyTrainedLayersFrom(trainedFile);
 }
-
+}

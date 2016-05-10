@@ -20,7 +20,7 @@
 
 //#define RUNTIME_CAFFEFICATION
 
-bool writeImage(const std::string& outputFile, const BinaryImage3D::Pointer& outImage)
+bool writeImage(const std::string& outputFile, const agtk::BinaryImage3D::Pointer& outImage)
 {
   typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
   writerType::Pointer writer = writerType::New();
@@ -137,7 +137,7 @@ int main(int argc, char** argv)
 #endif 
   std::shared_ptr<caffe::Net<float>> caffeNet;
   //Setting CPU or GPU
-  loadNet(modelFile, trainedFile, deviceId, caffeNet);
+  caffefication::loadNet(modelFile, trainedFile, deviceId, caffeNet);
   std::cout << "load images" << std::endl;
 
   itk::MetaImageIOFactory::RegisterOneFactory();
@@ -183,7 +183,7 @@ int main(int argc, char** argv)
 
   BinaryImage3D::Pointer outImage;
 
-  int success = classify(caffeNet.get(), preset, image16, imageMask, region, radiusXY, spacingXY, batchLength, groupX, groupY, classCount, isRgb, outImage);
+  int success = caffefication::classify(caffeNet.get(), preset, image16, imageMask, region, radiusXY, spacingXY, batchLength, groupX, groupY, classCount, isRgb, outImage);
 
   if (!success) {
     return EXIT_FAILURE;
