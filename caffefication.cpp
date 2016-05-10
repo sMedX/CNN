@@ -42,6 +42,13 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
   }
 
   std::cout << "Calculating indices" << std::endl;
+  std::cout << "region in original spacing " << region << std::endl;
+
+  for (size_t i = 0; i < IMAGE_DIM_2; ++i) {
+    region.GetModifiableIndex()[i] *= spacingXY;
+    region.GetModifiableSize()[i] *= spacingXY;
+  }
+  std::cout << "region in modified spacing " << region << std::endl;
 
   auto shrinkRegion = image->GetLargestPossibleRegion();
   Image3DSize radius3D;
@@ -89,11 +96,11 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
 
   std::cout << "total count:" << totalCount << std::endl;
 
-  outImage = BinaryImage3D::New();
-  outImage->CopyInformation(image);
-  outImage->SetRegions(image->GetLargestPossibleRegion());
-  outImage->Allocate();
-  outImage->FillBuffer(0);
+  auto classifiedImage = BinaryImage3D::New();
+  classifiedImage->CopyInformation(image);
+  classifiedImage->SetRegions(image->GetLargestPossibleRegion());
+  classifiedImage->Allocate();
+  classifiedImage->FillBuffer(0);
 
   std::cout << "." << std::endl;
 
@@ -196,14 +203,15 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
       } else {
         if (val != 0) {
           posCount++;
+          val = 1;
         }
-      }
+      } 
       //set group's area
       for (int k = -groupX / 2; k < groupX - groupX / 2; ++k) {
         for (int l = -groupY / 2; l < groupY - groupY / 2; ++l) {
           Image3DSize offset = { k, l, 0 };
           auto index2 = index + offset;
-          outImage->SetPixel(index2, val); // can be improved if only group 1x1 used
+          classifiedImage->SetPixel(index2, val); // can be improved if only group 1x1 used
         }
       }
 
@@ -224,18 +232,18 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
   //resampling back
   if (spacingXY != 0) { //resample image by axial slices
     std::cout << "resample" << std::endl;
-    typedef itk::ResampleImageFilter<BinaryImage3D, Int16Image3D> ResampleImageFilterType;
+    typedef itk::ResampleImageFilter<BinaryImage3D, BinaryImage3D> ResampleImageFilterType;
 
     auto nn_interpolator = itk::NearestNeighborInterpolateImageFunction<BinaryImage3D>::New();
 
     auto resampleFilter = ResampleImageFilterType::New();
-    resampleFilter->SetInput(outImage);
+    resampleFilter->SetInput(classifiedImage);
     resampleFilter->SetReferenceImage(image16);
     resampleFilter->SetUseReferenceImage(true);
     resampleFilter->SetInterpolator(nn_interpolator);
     resampleFilter->SetDefaultPixelValue(0);
     resampleFilter->UpdateLargestPossibleRegion();
-    outImage->Graft(resampleFilter->GetOutput());
+    outImage = resampleFilter->GetOutput();
   }
   return true;
 }

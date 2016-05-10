@@ -15,10 +15,12 @@
 // Forward declaration
 namespace caffe
 {
-  template <typename T>
-  class Net;
+template <typename T>
+class Net;
 }
 
+namespace caffefication
+{
 using namespace agtk;
 
 extern "C" DECLARE_DLL_FUNCTION(bool, classify, (caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
@@ -26,3 +28,4 @@ extern "C" DECLARE_DLL_FUNCTION(bool, classify, (caffe::Net<float>* caffeNet, co
   int groupY, int classCount, bool isRgb, OUT BinaryImage3D::Pointer& outImage))
 
 extern "C" DECLARE_DLL_FUNCTION(void, loadNet, (const std::string& modelFile, const std::string& trainedFile, int deviceId, std::shared_ptr<caffe::Net<float>>& caffeNet))
+}
