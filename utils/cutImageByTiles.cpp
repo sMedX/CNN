@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
   int radius;
   parser->GetValue("-radius", radius);
 
-  Image3DSize stride = { 1, 1, 0 };
+  Image3DSize stride = { 1, 1, 1 }; //default no-stride
   parser->GetITKValue<Image3DSize>("-stride", stride);
 
   std::string preset;
@@ -207,13 +207,16 @@ int main(int argc, char* argv[])
       std::cout << "don't mask" << std::endl;
       itk::ImageRegionConstIterator<BinaryImage3D> itLabel(label1, wholeRegion);
       for (itLabel.GoToBegin(); !itLabel.IsAtEnd(); ++itLabel) {
-        if (label1->GetPixel(itLabel.GetIndex()) == 0) {// if negative
-          if (negativeCount % strideNegative == 0) {
+        auto index = itLabel.GetIndex();
+        if (index[0] % stride[0] == 0 && index[1] % stride[1] == 0 && index[2] % stride[2] == 0) { // striding for whole image
+          if (label1->GetPixel(index) == 0) {// if negative
+            if (negativeCount % strideNegative == 0) { // striding only for negative
+              indices.push_back(itLabel.GetIndex());
+            }
+            negativeCount++;
+          } else {
             indices.push_back(itLabel.GetIndex());
           }
-          negativeCount++;
-        } else {
-          indices.push_back(itLabel.GetIndex());
         }
       }
       class1Count = indices.size() - negativeCount / strideNegative;
@@ -227,18 +230,19 @@ int main(int argc, char* argv[])
       for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
         if (itMask.Get() != 0) {
           auto& index = itMask.GetIndex();
-
-          if (label2.IsNotNull() && label2->GetPixel(index) != 0) {// if 2 class
-            indices.push_back(index);
-            class2Count++;
-          } else if (label1->GetPixel(index) != 0) {// if 1 class
-            indices.push_back(index);
-            class1Count++;
-          } else {
-            if (negativeCount % strideNegative == 0) {
+          if (index[0] % stride[0] == 0 && index[1] % stride[1] == 0 && index[2] % stride[2] == 0) { // striding for whole image
+            if (label2.IsNotNull() && label2->GetPixel(index) != 0) {// if 2 class
               indices.push_back(index);
+              class2Count++;
+            } else if (label1->GetPixel(index) != 0) {// if 1 class
+              indices.push_back(index);
+              class1Count++;
+            } else {// if negative
+              if (negativeCount % strideNegative == 0) { // striding only for negative
+                indices.push_back(index);
+              }
+              negativeCount++;
             }
-            negativeCount++;
           }
         }
       }
@@ -274,7 +278,7 @@ int main(int argc, char* argv[])
 
       //name image
       std::string indexStr = std::to_string(index[0]) + "_" + std::to_string(index[1]) + "_" + std::to_string(index[2]);
-      auto label1I = label1->GetPixel(index);
+      auto label1I = label1->GetPixel(index); // TODO use list of indices a-priori. don't read label image at this point
       std::string labelStr;
       // boosted classes
       if (isAdaptiveClasses) {
