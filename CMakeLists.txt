@@ -69,7 +69,6 @@ message(STATUS "Caffe_LIBRARIES ${Caffe_LIBRARIES}")
 message(STATUS "Caffe_LINKER_LIBS ${Caffe_LINKER_LIBS}")
 
 add_subdirectory(classification)
-add_subdirectory(validation)
 add_subdirectory(postprocessing)
 add_subdirectory(utils)
 
@@ -77,20 +76,22 @@ add_subdirectory(utils)
 list(APPEND LIBRARIES "C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl.lib;C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl_cpp.lib;") #todo
 
 #TODO gdcm lib from itk
-list(APPEND LIBRARIES "D:\ap\SB\MITK-superbuild\ep\lib\gdcmMEXD.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmMSFF.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmgetopt.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmopenjpeg.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmjpeg8.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmjpeg16.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmjpeg12.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmCommon.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmzlib.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmDSED.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmexpat.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmIOD.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmDICT.lib;\
-D:\ap\SB\MITK-superbuild\ep\lib\gdcmcharls.lib;")
+list(APPEND LIBRARIES "D:/ap/SB/MITK-superbuild/ep/lib/gdcmMEXD.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmMSFF.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmgetopt.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmopenjpeg.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmjpeg8.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmjpeg16.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmjpeg12.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmCommon.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmzlib.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmDSED.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmexpat.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmIOD.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmDICT.lib;\
+D:/ap/SB/MITK-superbuild/ep/lib/gdcmcharls.lib;")
+
+add_subdirectory(validation)
 
 set(SOURCES "caffefication.cpp" "caffefication.h")
 include_directories("utils")
