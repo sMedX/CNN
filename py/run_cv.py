@@ -6,13 +6,15 @@ import itertools
 import sys
 import random
 
-classCount = '3'
-cut = 'D:\\alex\\CNN-build\\utils\\Release\\CutImageByTiles.exe'
+import time
+
+classCount = '2'
+cut = 'D:/alex/CNN-build4/utils/Release/CutImageByTiles.exe'
 makeTileLists = ['python.exe', 'make_sample_names_' + classCount + '-classes.py']
-train = 'C:\\caffe\\bin\\caffe_cc35.exe'
-clas = 'D:/alex/caffe-ms/caffe-master/Build/x64/Release/caffe.exe'
-postproc = 'D:\\alex\\CNN-build\\postprocessing\\Release\\postprocessing.exe'
-valid = 'D:\\alex\\CNN-build\\validation\\Release\\Validation.exe'
+train = 'C:/caffe/bin/caffe_cc35.exe'
+clas = 'D:/alex/CNN-build4/classification/Release/classification.exe'
+postproc = 'D:/alex/CNN-build4/postprocessing/Release/postprocessing.exe'
+valid = 'D:/alex/CNN-build4/validation/Release/Validation.exe'
 
 preset = 'livertumors'
 ver = '28'
@@ -33,10 +35,10 @@ mask = 'liver.nrrd'
 patient = 'patient.nrrd'
   
 imagesPath = 'D:\\alex\\images'
-tilesFolder = os.path.join('D:\\alex\\tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr + tilesParam)
+tilesFolder = os.path.join('D:/alex/tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr + tilesParam)
 samplesList = os.path.join(imagesPath, preset, 'samplesList.txt')
 
-deploy = os.path.join('C:\\caffe', preset, ver, 'deploy.prototxt')
+deploy = os.path.join('D:/alex/caffe-nets', preset, ver, 'deploy.prototxt')
 start = [0, 0, 0]
 size = [512, 512, 1000]
 batchLength = '1024'
