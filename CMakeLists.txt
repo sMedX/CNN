@@ -69,8 +69,6 @@ message(STATUS "Caffe_LIBRARIES ${Caffe_LIBRARIES}")
 message(STATUS "Caffe_LINKER_LIBS ${Caffe_LINKER_LIBS}")
 
 add_subdirectory(classification)
-add_subdirectory(postprocessing)
-add_subdirectory(utils)
 
 #list(APPEND LIBRARIES "D:/alex/caffe-ms/NugetPackages/hdf5-v120-complete.1.8.15.2/lib/native/lib/x64/hdf5_hl.lib") #todo
 list(APPEND LIBRARIES "C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl.lib;C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl_cpp.lib;") #todo
@@ -92,6 +90,8 @@ D:/ap/SB/MITK-superbuild/ep/lib/gdcmDICT.lib;\
 D:/ap/SB/MITK-superbuild/ep/lib/gdcmcharls.lib;")
 
 add_subdirectory(validation)
+add_subdirectory(postprocessing)
+add_subdirectory(utils)
 
 set(SOURCES "caffefication.cpp" "caffefication.h")
 include_directories("utils")
