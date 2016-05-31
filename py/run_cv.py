@@ -9,7 +9,7 @@ import numpy as np # for creation infogainHMatrix
 import caffe # for creation infogainHMatrix
 import time
 
-classCount = '2'
+classCount = '3'
 cut = 'D:/alex/CNN-build4/utils/Release/CutImageByTiles.exe'
 makeTileLists = ['python.exe', 'make_sample_names_' + classCount + '-classes.py']
 train = 'D:/alex/ms-caffe-rep-copy1/Build/x64/Release/caffe.exe'
@@ -18,12 +18,12 @@ postproc = 'D:/alex/CNN-build4/postprocessing/Release/postprocessing.exe'
 valid = 'D:/alex/CNN-build4/validation/Release/Validation.exe'
 
 preset = 'livertumors'
-ver = '28_infogainFN10'##
+ver = '29-ada-28_infogainFN10'##
 spacing = '0.782'
 spacingStr = 'orig' if spacing=='0' else spacing
-tilesParam = ''##
+tilesParam = '-ada-28_infogainFN10'##
 
-deviceId = '0'##
+deviceId = '1'##
 iters = '15000'##
 
 dir=os.path.join('D:/alex/caffe-nets', preset, ver)
@@ -57,7 +57,7 @@ def main():
     
     #retcode = subprocess.call([cut, '-listFile', samplesList, '-imageName', patient, '-labelName1', label,
     #                 '-labelName2', 'livertumors_dark.nrrd', '-maskName', mask, '-radius', r, '-preset', preset,
-    #                 '-stride 0 0 0', '-spacingXY', spacing, spacing, '-strideNegative 1', '-folder', tilesFolder])
+    #                 '-stride 0 0 0', '-spacingXY', spacing, spacing, '-strideNegative 1', '-folder', tilesFolder.replace('/', '\\')])
     #
     #if (retcode != 0):
     #    print 'error. ', cut, ' exit with ', retcode
@@ -69,7 +69,7 @@ def main():
         print 'error. ', cut, ' exit with ', retcode
         return
 
-    # matrix with penalties for infogain loss layer
+    #matrix with penalties for infogain loss layer
     createHMatrix()
     
     for k in range(0, n):
@@ -114,12 +114,22 @@ def main():
         with open(samplesList) as f:
             for line in f:
                 line = line.replace('\n','')
-                #subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma, '-preset', preset])
+                subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma, '-preset', preset])
         
         suffix = suffix + '-gaussian' + sigma + '.nrrd'
         outputCNN = preset + '-cnn' + suffix
 
-        #validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)
+        validate(sampleTrainListK, sampleTestListK, label, outputCNN, suffix)
+        
+        #adaptive cut
+        #tilesFolderAdaptive = tilesFolder+'-ada-'+ver
+        #retcode = subprocess.call([cut, '-listFile', sampleTestListK, '-imageName', patient, '-labelName1', label,
+        #             '-labelName2', outputCNN, '-maskName', mask, '-radius', r, '-preset', preset,
+        #             '-stride 1 1 1', '-spacingXY', spacing, spacing, '-strideNegative 4', '-folder', tilesFolderAdaptive.replace('/', '\\')])
+
+        #if (retcode != 0):
+        #    print 'error. ', cut, ' exit with ', retcode
+        #    return
     return
 
 def makeSampleNames(classCount, pathTiles, pathOut, pathImages, samplesListFile, n):
@@ -272,11 +282,24 @@ def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTestListK
         .replace('%trainTilesList%', tileTrainListK.replace('\\','/')) \
         .replace('%trainTestTilesList%', tileTrainTestListK.replace('\\','/')) \
         .replace('%testTestTilesList%', tileTestTestListK.replace('\\','/')) \
-        .replace('%infogainHMatrix%', os.path.join(dir, 'infogainH.binaryproto').replace('\\','/'))
+        .replace('%infogainHMatrix%', os.path.join(dir, 'infogainH.binaryproto').replace('\\','/')) \
+        .replace('%classCount%', classCount)
 
     with open(net, 'w') as file:
         file.write(fileData)
     print 'net ' + net + ' has been created'
+    
+    deployTemplate = os.path.join(dir, 'deployTemplate.prototxt')
+    deploy = os.path.join(dir, 'deploy.prototxt')
+    fileData = None
+    with open(netTemplate, 'r') as file:
+        fileData = file.read()
+    fileData = fileData \
+        .replace('%classCount%', classCount)
+
+    with open(deploy, 'w') as file:
+        file.write(fileData)
+    print 'deploy ' + deploy + ' has been created'
     
     solverTemplate = os.path.join(dir, 'solverTemplate.prototxt')
     solver = os.path.join(dir, 'solver-cv-' + kn + '.prototxt')
@@ -294,10 +317,10 @@ def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTestListK
     return solver
 
 def createHMatrix(): # todo make valuable parameters
-    L=2
+    L=int(classCount)
     H = np.eye( L, dtype = 'f4' ) 
 
-    H[0,0]=10 # weight of FP error
+    H[0,0]=4 # weight of FP error
     print H
 
     blob = caffe.io.array_to_blobproto( H.reshape( (1,1,L,L)))
