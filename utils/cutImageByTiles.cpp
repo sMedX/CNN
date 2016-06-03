@@ -188,6 +188,7 @@ int main(int argc, char* argv[])
   std::cout << "inputData.size() " << inputDirs.size() << std::endl;
 
   // set up output directories
+  std::cout << outputFolder << std::endl;
   system((std::string("md ") + outputFolder).c_str());
 
   //itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
@@ -267,7 +268,7 @@ int main(int argc, char* argv[])
     auto image = smartCastImage(preset, image16, nullptr);
 
     //hardcoded consts
-    std::vector<float> spacingXYVector = {0.55f, 0.7f, 0.782f, 0.85f, 1.00f};
+    std::vector<float> spacingXYVector = {0};
     for (float spacingXY : spacingXYVector) {
       std::cout << "preprocess images" << std::endl;
       std::cout << "spacing :" << spacingXY << std::endl;
