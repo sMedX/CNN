@@ -17,17 +17,15 @@
 
 namespace caffefication {
 bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
-  UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radiusXY, float spacingXY, int batchLength, int groupX,
-  int groupY, int classCount, bool isRgb, OUT BinaryImage3D::Pointer& outImage)
+  UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radius, float spacingXY, int batchLength, int groupX,
+  int groupY, int classCount, bool isRgb, BinaryImage3D::Pointer& outImage)
 {
   if (classCount < 1 && classCount > 3) {
     std::cout << "classCount must be 1, 2, 3 or 4";
   }
 
-  UInt8Image3D::Pointer image8 = UInt8Image3D::New();
-  UInt8Image3D::Pointer imageNull = nullptr;
-
-  preprocess(radiusXY, preset, spacingXY, isRgb, image16, imageNull, imageNull, imageMask, imageNull, image8);
+  UInt8Image3D::Pointer image8 = preprocess(radius, spacingXY, isRgb, smartCastImage(preset, image16, imageMask));
+  imageMask = preprocessBinary(radius, spacingXY, isRgb, imageMask);
 
   std::cout << "cast image to float" << std::endl;
   typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
@@ -54,9 +52,9 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
   auto shrinkRegion = image->GetLargestPossibleRegion();
   Image3DSize radius3D;
   if (isRgb) {
-    radius3D = { radiusXY, radiusXY, 0 };
+    radius3D = { radius, radius, 0 };
   } else {
-    radius3D = { radiusXY, radiusXY, 1 };
+    radius3D = { radius, radius, 1 };
   }
   shrinkRegion.ShrinkByRadius(radius3D);
   region.Crop(shrinkRegion);
@@ -118,10 +116,10 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
   std::cout << "channels: " << channels << std::endl;
 
   // tile's properties
-  const int height = 2 * radiusXY;
-  const int width = 2 * radiusXY;
+  const int height = 2 * radius;
+  const int width = 2 * radius;
   const int tileSize = width*height*channels;
-  const int lineSizeInBytes = 2 * radiusXY*sizeof(float);
+  const int lineSizeInBytes = 2 * radius*sizeof(float);
 
   // image's properties
   const auto& imageSize = image->GetLargestPossibleRegion().GetSize();
@@ -154,7 +152,7 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
           const int zOffset = (index[2] + j) * sliceSize;
           const float* src = buffer + zOffset + yOffsetPart + xOffset;
 
-          for (int iRow = 0; iRow < 2 * radiusXY; iRow++) {
+          for (int iRow = 0; iRow < 2 * radius; iRow++) {
             memcpy(dst, src, lineSizeInBytes);
 
             src += lineSize; // adjust yOffset
@@ -166,7 +164,7 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
         const int zOffset = index[2] * sliceSize;
         const float* src = buffer + zOffset + yOffsetPart + xOffset;
 
-        for (int iRow = 0; iRow < 2 * radiusXY; iRow++) { // try to compute offset by 1 vector command
+        for (int iRow = 0; iRow < 2 * radius; iRow++) { // try to compute offset by 1 vector command
           memcpy(dst, src, lineSizeInBytes);
 
           src += lineSize; // adjust yOffset
