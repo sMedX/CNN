@@ -145,8 +145,8 @@ int main(int argc, char* argv[])
   std::string preset;
   parser->GetValue("-preset", preset);
 
-  //float spacingXY;
-  //parser->GetITKValue("-spacingXY", spacingXY);
+  float spacingXY;
+  parser->GetValue("-spacingXY", spacingXY);
 
   int strideNegative = 4; // additional stride for negative points
   parser->GetValue("-strideNegative", strideNegative);
@@ -246,7 +246,9 @@ int main(int argc, char* argv[])
         continue;
       }
     } else {
-      mask = nullptr;
+      mask->SetRegions(image16->GetLargestPossibleRegion());
+      mask->Allocate();
+      mask->FillBuffer(1);
     }
 
     BinaryImage3D::Pointer adaptive = BinaryImage3D::New();
@@ -265,10 +267,10 @@ int main(int argc, char* argv[])
     //todo add check for equal size
 
     // organ-based transformation to UINT8 from int16
-    auto image = smartCastImage(preset, image16, nullptr);
+    auto image = smartCastImage(preset, image16, mask);
 
     //hardcoded consts
-    std::vector<float> spacingXYVector = {0};
+    std::vector<float> spacingXYVector = {spacingXY};
     for (float spacingXY : spacingXYVector) {
       std::cout << "preprocess images" << std::endl;
       std::cout << "spacing :" << spacingXY << std::endl;
@@ -289,52 +291,28 @@ int main(int argc, char* argv[])
       int class1Count = 0;
       int class2Count = 0;
 
-      if (isNoMask) { // not take in count 3-class problem
-        // this part can be removed when ordinal white image will be used as mask
-        std::cout << "don't mask" << std::endl;
-        itk::ImageRegionConstIterator<BinaryImage3D> itLabel(label1Preproc, wholeRegion);
-        for (itLabel.GoToBegin(); !itLabel.IsAtEnd(); ++itLabel) {
-          auto index = itLabel.GetIndex();
+      itk::ImageRegionConstIterator<BinaryImage3D> itMask(maskPreproc, wholeRegion);
+
+      for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
+        if (itMask.Get() != 0) {
+          auto& index = itMask.GetIndex();
           if (index[0] % stride[0] == 0 && index[1] % stride[1] == 0 && index[2] % stride[2] == 0) { // striding for whole image
-            if (label1Preproc->GetPixel(index) == 0) {// if negative
+            if (label2Preproc.IsNotNull() && label2Preproc->GetPixel(index) != 0) {// if 2 class
+              indices.push_back(index);
+              class2Count++;
+            } else if (label1Preproc->GetPixel(index) != 0) {// if 1 class
+              indices.push_back(index);
+              class1Count++;
+            } else {// if negative
               if (negativeCount % strideNegative == 0) { // striding only for negative
-                indices.push_back(itLabel.GetIndex());
+                indices.push_back(index);
               }
               negativeCount++;
-            } else {
-              indices.push_back(itLabel.GetIndex());
-            }
-          }
-        }
-        class1Count = indices.size() - negativeCount / strideNegative;
-      } else {
-        std::cout << "use mask" << std::endl;
-        maskPreproc->Print(std::cout);
-        wholeRegion.Print(std::cout);
-
-        itk::ImageRegionConstIterator<BinaryImage3D> itMask(maskPreproc, wholeRegion);
-
-        for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
-          if (itMask.Get() != 0) {
-            auto& index = itMask.GetIndex();
-            if (index[0] % stride[0] == 0 && index[1] % stride[1] == 0 && index[2] % stride[2] == 0) { // striding for whole image
-              if (label2Preproc.IsNotNull() && label2Preproc->GetPixel(index) != 0) {// if 2 class
-                indices.push_back(index);
-                class2Count++;
-              } else if (label1Preproc->GetPixel(index) != 0) {// if 1 class
-                indices.push_back(index);
-                class1Count++;
-              } else {// if negative
-                if (negativeCount % strideNegative == 0) { // striding only for negative
-                  indices.push_back(index);
-                }
-                negativeCount++;
-              }
             }
           }
         }
       }
-
+      
       const int totalCount = indices.size();
       negativeCount /= strideNegative;
 
