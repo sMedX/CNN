@@ -297,10 +297,10 @@ int main(int argc, char* argv[])
         if (itMask.Get() != 0) {
           auto& index = itMask.GetIndex();
           if (index[0] % stride[0] == 0 && index[1] % stride[1] == 0 && index[2] % stride[2] == 0) { // striding for whole image
-            if (label2Preproc.IsNotNull() && label2Preproc->GetPixel(index) != 0) {// if 2 class
+            if (label2Preproc.IsNotNull() && label2Preproc->GetPixel(index) != 0) {// if 3 class
               indices.push_back(index);
               class2Count++;
-            } else if (label1Preproc->GetPixel(index) != 0) {// if 1 class
+            } else if (label1Preproc->GetPixel(index) != 0) {// if 2 class
               indices.push_back(index);
               class1Count++;
             } else {// if negative
