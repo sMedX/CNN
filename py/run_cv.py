@@ -64,10 +64,7 @@ def main():
     #    return
 
     # make lists
-    success = makeSampleNames(int(classCount), tilesFolder, dir, imagesPath,samplesList, n)
-    if not success:
-        print 'error. ', cut, ' exit with ', retcode
-        return
+    makeSampleNames(int(classCount), tilesFolder, dir, imagesPath, samplesList, n)
 
     #matrix with penalties for infogain loss layer
     createHMatrix()
@@ -202,10 +199,11 @@ def makeSampleNames(classCount, pathTiles, pathOut, pathImages, samplesListFile,
         
             iList = [] #list of files for current class
             for path in iPathTiles:
-                for file in os.listdir(path):
-                   iList.append(os.path.join(path,file))
+                if os.path.exists(path):
+                    for file in os.listdir(path):
+                       iList.append(os.path.join(path,file))
             list.append(iList)
-            
+
             iCount = len(iList)
             print 'class ', str(i), ' count: ', str(iCount)
             iCount /= stride[i] 
@@ -225,22 +223,19 @@ def makeSampleNames(classCount, pathTiles, pathOut, pathImages, samplesListFile,
                 with open(os.path.join(pathOut, 'tileList-test-test-cv-'+kn+'.txt'), 'w') as testTestF:            
                     for i in range(0, classCount):
                         if count[i] < iTestCount:
-                            print 'too few elements in class ', str(i)
-                            print 'Count must be more than iTestCount'
-                            return False
+                            print 'too few elements in class ', str(i), '. Used ', count[i], ' only'
                
                         iSample = random.sample(list[i], count[i])
 
                         #test on train  
-                        for iClassFile in iSample[ : iTestCount]:
+                        for iClassFile in iSample[ : min(iTestCount, count[i])]:
                             print >>testTrainF, iClassFile + ' ' + str(i) 
                         #train
-                        for iClassFile in iSample[iTestCount :]:
+                        for iClassFile in iSample[min(iTestCount, count[i]) :]:
                             print >>trainF, iClassFile  + ' ' + str(i)
                                 
                         #test on test
-                        print 'test: '+str(iTestCount)
-                        #testPathTiles = []
+                        print 'test: '+str(min(iTestCount, count[i]))
                         iPathTiles = []
                     
                         for sample in testDirs:
@@ -248,16 +243,16 @@ def makeSampleNames(classCount, pathTiles, pathOut, pathImages, samplesListFile,
                     
                         iList = []
                         for path in iPathTiles:
-                            for file in os.listdir(path):
-                                iList.append(os.path.join(path,file))
+                            if os.path.exists(path):
+                                for file in os.listdir(path):
+                                    iList.append(os.path.join(path,file))
 
-                        iSample = random.sample(iList, min([iTestCount, len(iList)])) 
+                        iSample = random.sample(iList, min([iTestCount, len(iList), count[i]])) 
                         
                         print 'used test of ', str(i), ' class:' + str(len(iSample))
                         
                         for iClassFile in iSample:
                             print >>testTestF, iClassFile  + ' ' + str(i)
-    return True
 
 def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
     with open(samplesTrainListK) as f:
@@ -292,7 +287,7 @@ def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTestListK
     deployTemplate = os.path.join(dir, 'deployTemplate.prototxt')
     deploy = os.path.join(dir, 'deploy.prototxt')
     fileData = None
-    with open(netTemplate, 'r') as file:
+    with open(deployTemplate, 'r') as file:
         fileData = file.read()
     fileData = fileData \
         .replace('%classCount%', classCount)
