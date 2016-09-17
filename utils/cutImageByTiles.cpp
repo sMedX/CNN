@@ -265,7 +265,6 @@ int main(int argc, char* argv[])
     }
 
     //todo add check for equal size
-
     // organ-based transformation to UINT8 from int16
     auto image = smartCastImage(preset, image16, mask);
 
@@ -292,6 +291,9 @@ int main(int argc, char* argv[])
       int class2Count = 0;
 
       itk::ImageRegionConstIterator<BinaryImage3D> itMask(maskPreproc, wholeRegion);
+      std::cout << label1Preproc;
+      std::cout << label2Preproc;
+
 
       for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
         if (itMask.Get() != 0) {
