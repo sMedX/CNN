@@ -36,10 +36,12 @@ find_package(OpenCV)
 #message(STATUS "Boost_LIBRARIES")
 #message(STATUS ${Boost_LIBRARIES})
 
-#if( WIN32 )
+if( WIN32 )
   # disable autolinking in boost
  # add_definitions(-DBOOST_ALL_NO_LIB)
-#endif()
+ #disable default static linking
+ add_definitions(-DBOOST_ALL_DYN_LINK) 
+endif()
 
 # ------------------------------------------------------------------------------
 # AGTK
@@ -74,20 +76,20 @@ add_subdirectory(classification)
 list(APPEND LIBRARIES "C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl.lib;C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl_cpp.lib;") #todo
 
 #TODO gdcm lib from itk
-list(APPEND LIBRARIES "D:/ap/SB/MITK-superbuild/ep/lib/gdcmMEXD.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmMSFF.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmgetopt.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmopenjpeg.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmjpeg8.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmjpeg16.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmjpeg12.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmCommon.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmzlib.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmDSED.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmexpat.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmIOD.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmDICT.lib;\
-D:/ap/SB/MITK-superbuild/ep/lib/gdcmcharls.lib;")
+list(APPEND LIBRARIES "D:/apb/SB/MITK-superbuild/ep/lib/gdcmMEXD.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmMSFF.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmgetopt.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmopenjpeg.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmjpeg8.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmjpeg16.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmjpeg12.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmCommon.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmzlib.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmDSED.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmexpat.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmIOD.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmDICT.lib;\
+D:/apb/SB/MITK-superbuild/ep/lib/gdcmcharls.lib;")
 
 add_subdirectory(validation)
 add_subdirectory(postprocessing)
