@@ -17,7 +17,13 @@
 #include "caffefication.h"
 
 namespace caffefication {
-bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
+  // perfroms classifying of i-th batch (batchLength items of indices) of input image and store result in classifiedImage
+  // image and classifiedImage must have same geometry
+  // classifiedImage must be initializated
+  // return 
+  void classifyIthBatch(caffe::Net<float>* caffeNet, const FloatImage3D::Pointer& image, int radius, int batchLength,
+    int groupX, int groupY, int classCount, int channels, std::vector<Image3DIndex>& indices,
+    itk::Image<unsigned char, 3>::Pointer classifiedImage, int& posCount, int i)
   {
     auto time0 = clock();
 
