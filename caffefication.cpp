@@ -133,8 +133,8 @@ namespace caffefication {
   UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radius, float spacingXY, int batchLength, int groupX,
   int groupY, int classCount, bool isRgb, BinaryImage3D::Pointer& outImage)
 {
-  if (classCount < 1 && classCount > 3) {
-    std::cout << "classCount must be 1, 2, 3 or 4"; //todo 1?
+  if (classCount < 2 && classCount > 3) {
+    std::cout << "classCount must be 2, 3 or 4";
   }
 
   int channels = isRgb ? 3 : 1;
@@ -148,8 +148,6 @@ namespace caffefication {
     image8 = preprocess(radius, spacingXY, isRgb, imgage8Tmp);
   }
   imageMask = preprocessBinary(radius, spacingXY, isRgb, imageMask);
-
-  agtk::writeImage(imageMask, "imageMaskPreprocessed.nrrd"); //todo debug
 
   std::cout << "cast image to float" << std::endl;
   typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
@@ -187,23 +185,21 @@ namespace caffefication {
   std::cout << "region: " << region << std::endl;
   if (imageMask.IsNotNull()) {
     std::cout << "use mask" << std::endl;
-    itk::ImageRegionConstIterator<BinaryImage3D> itMask(imageMask, region);
+    // todo there is mistake with region calculation. It's noticable on very littly masks but noticable.
+    itk::ImageRegionConstIterator<BinaryImage3D> itMask(imageMask, imageMask->GetLargestPossibleRegion()/*region*/);
 
-    int inMask = 0;//debug
     for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
       if (itMask.Get() != 0) {
         //take central pixel of group
         const auto& index = itMask.GetIndex();
-        inMask++;//debug
         if (index[0] % groupX == groupX / 2 && index[1] % groupY == groupY / 2) {
           indices.push_back(itMask.GetIndex());
         }
       }
     }
-
-    std::cout << "in mask: " << inMask << std::endl;
   } else {
     std::cout << "not use mask" << std::endl;
+    std::cout << "WARNING: region calculation may be not precise, use mask instead" << std::endl;
     itk::ImageRegionConstIterator<FloatImage3D> it(image, region);
     for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
       //take central pixel of group
@@ -236,6 +232,14 @@ namespace caffefication {
 
   std::cout << "." << std::endl;
 
+  //reshape the net to fill last batch
+  const int height = 2 * radius, width = 2 * radius;;
+  caffeNet->blob_by_name("data")->Reshape(batchLength, channels, height, width);
+  caffeNet->Reshape(); // optional -- the net will reshape automatically before a call to forward()
+
+  auto newShape = caffeNet->input_blobs()[0]->shape();
+  std::cout << "new shape: " << newShape[0] << ", " << newShape[1] << ", " << newShape[2] << ", " << newShape[3] << std::endl;
+
   int posCount = 0;
 
   std::cout << "Applying CNN in deploy config" << std::endl;
@@ -265,9 +269,6 @@ namespace caffefication {
     std::cout << "batchLengthRest: " << batchLengthRest << std::endl;
 
     //reshape the net to fill last batch
-    const int height = radius * 2;
-    const int& width = height;
-    // from https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/caffe-users/hqXJovy2-DQ/y3Z24vv_vzQJ
     caffeNet->blob_by_name("data")->Reshape(batchLengthRest, channels, height, width);
     caffeNet->Reshape(); // optional -- the net will reshape automatically before a call to forward()
 
@@ -282,20 +283,18 @@ namespace caffefication {
 
   if (totalCount / batchLength > 1){
     std::cout << "performance for full-batched parts" << std::endl;
-    auto time = time1 - time0;
+    double time = (time1 - time0) / CLOCKS_PER_SEC;
     auto count = (totalCount / batchLength)*batchLength;
-    auto avgTime = static_cast<double>(count) / time;
+    auto avgTime = time / count;
 
-    std::cout << "avgerage time per one unit: " << avgTime; //todo
-    std::cout << "avgerage time per million units: " << avgTime*1e6;
+    std::cout << "avgerage time (ms) per 1000 units: " << avgTime * 1000 << std::endl;;
   } else {
     std::cout << "performance for part-batched part" << std::endl;
-    auto time = time2 - time1;
+    double time = (time2 - time1) / CLOCKS_PER_SEC;
     auto count = totalCount % batchLength;
-    auto avgTime = static_cast<double>(count) / time;
+    auto avgTime = time / count;
 
-    std::cout << "avgerage time per one unit: " << avgTime << std::endl; //todo
-    std::cout << "avgerage time per million units: " << avgTime*1e6 << std::endl;
+    std::cout << "avgerage time (ms) per 1000 units: " << avgTime*1000 << std::endl;
   }
   std::cout << "positives:" << posCount << std::endl;
 
