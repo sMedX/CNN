@@ -73,6 +73,7 @@ inline BinaryImage3D::Pointer padImage(const BinaryImage3D* image, const itk::Im
 inline UInt8Image3D::Pointer smartCastImage(const std::string& preset, Int16Image3D* image16, BinaryImage3D* mask)
 {
   std::cout << "shift, sqeeze" << std::endl;
+  std::cout << "image16 " << image16 << std::endl;
 
   if (preset == "pancreas") {
     const int shift = 190;

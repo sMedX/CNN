@@ -11,126 +11,29 @@
 #include <caffe/blob.hpp>
 
 #include <agtkResampling.h>
+#include <agtkIO.h>
 
 #include "preprocess.h"
 #include "caffefication.h"
 
 namespace caffefication {
 bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
-  UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radius, float spacingXY, int batchLength, int groupX,
-  int groupY, int classCount, bool isRgb, BinaryImage3D::Pointer& outImage)
-{
-  if (classCount < 1 && classCount > 3) {
-    std::cout << "classCount must be 1, 2, 3 or 4";
-  }
-
-  UInt8Image3D::Pointer image8 = preprocess(radius, spacingXY, isRgb, smartCastImage(preset, image16, imageMask));
-  imageMask = preprocessBinary(radius, spacingXY, isRgb, imageMask);
-
-  std::cout << "cast image to float" << std::endl;
-  typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
-  auto cast = Cast::New();
-  cast->SetInput(image8);
-  cast->Update();
-  FloatImage3D::Pointer image = cast->GetOutput();
-  if (imageMask != nullptr) {
-    if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
-      std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
-      return false;
-    }
-  }
-
-  std::cout << "Calculating indices" << std::endl;
-  std::cout << "region in original spacing " << region << std::endl;
-
-  for (size_t i = 0; i < IMAGE_DIM_2; ++i) {
-    region.GetModifiableIndex()[i] *= spacingXY;
-    region.GetModifiableSize()[i] *= spacingXY;
-  }
-  std::cout << "region in modified spacing " << region << std::endl;
-
-  auto shrinkRegion = image->GetLargestPossibleRegion();
-  Image3DSize radius3D;
-  if (isRgb) {
-    radius3D = { radius, radius, 0 };
-  } else {
-    radius3D = { radius, radius, 1 };
-  }
-  shrinkRegion.ShrinkByRadius(radius3D);
-  region.Crop(shrinkRegion);
-
-  std::vector<Image3DIndex> indices;
-  std::cout << "region: " << region << std::endl;
-  if (imageMask.IsNotNull()) {
-    std::cout << "use mask" << std::endl;
-    itk::ImageRegionConstIterator<BinaryImage3D> itMask(imageMask, region);
-
-    for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
-      if (itMask.Get() != 0) {
-        //take central pixel of group
-        const auto& index = itMask.GetIndex();
-        if (index[0] % groupX == groupX / 2 && index[1] % groupY == groupY / 2) {
-          indices.push_back(itMask.GetIndex());
-        }
-      }
-    }
-  } else {
-    std::cout << "not use mask" << std::endl;
-    itk::ImageRegionConstIterator<FloatImage3D> itMask(image, region);
-    for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
-      //take central pixel of group
-      auto& index = itMask.GetIndex();
-      if (index[0] % groupX == groupX / 2 && index[1] % groupY == groupY / 2) {
-        indices.push_back(itMask.GetIndex());
-      }
-    }
-  }
-
-  //reorder like 'zxy'
-  //std::stable_sort(indices.begin(), indices.end(), [](agtk::Image3DIndex a, agtk::Image3DIndex b) // todo maybe use ordinal sort
-  //{
-  //  return a[2] != b[2] ? a[2] < b[2] : a[0] < b[0];
-  //});
-  const int totalCount = indices.size();
-
-  std::cout << "total count:" << totalCount << std::endl;
-
-  auto classifiedImage = BinaryImage3D::New();
-  classifiedImage->CopyInformation(image);
-  classifiedImage->SetRegions(image->GetLargestPossibleRegion());
-  classifiedImage->Allocate();
-  classifiedImage->FillBuffer(0);
-
-  std::cout << "." << std::endl;
-
-  int itCount = 0;
-  int posCount = 0;
-
-  std::cout << "Applying CNN in deploy config" << std::endl;
-
-  float* buffer = image->GetBufferPointer();
-
-  int channels = isRgb ? 3 : 1;
-
-  std::cout << "isRgb: " << isRgb << std::endl;
-  std::cout << "channels: " << channels << std::endl;
-
-  // tile's properties
-  const int height = 2 * radius;
-  const int width = 2 * radius;
-  const int tileSize = width*height*channels;
-  const int lineSizeInBytes = 2 * radius*sizeof(float);
-
-  // image's properties
-  const auto& imageSize = image->GetLargestPossibleRegion().GetSize();
-  const int sliceSize = imageSize[0] * imageSize[1];
-  const int lineSize = imageSize[1];
-
-  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
-
-  for (int i = 0; i < totalCount / batchLength; ++i) { //todo fix last total%batch_size indices
+  {
     auto time0 = clock();
-    std::cout << i << "th batch" << std::endl;
+
+    float* buffer = image->GetBufferPointer();
+
+    // tile's properties
+    const int height = 2 * radius;
+    const int width = 2 * radius;
+    const int tileSize = width*height*channels;
+    const int lineSizeInBytes = 2 * radius*sizeof(float);
+
+    // image's properties
+    const auto& imageSize = image->GetLargestPossibleRegion().GetSize();
+    const int sliceSize = imageSize[0] * imageSize[1];
+    const int lineSize = imageSize[1];
+
 
     caffe::Blob<float>* blob = new caffe::Blob<float>(batchLength, channels, height, width);
 
@@ -147,7 +50,7 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
       const int tileOffset = iTile*tileSize; // todo remove these line dst buffer is adjusted by +=
       float* dst = blob->mutable_cpu_data() + tileOffset;
 
-      if (isRgb) {
+      if (channels == 3) {
         for (int j = -1; j < 2; j++) { // -1, 0, 1
           const int zOffset = (index[2] + j) * sliceSize;
           const float* src = buffer + zOffset + yOffsetPart + xOffset;
@@ -164,7 +67,7 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
         const int zOffset = index[2] * sliceSize;
         const float* src = buffer + zOffset + yOffsetPart + xOffset;
 
-        for (int iRow = 0; iRow < 2 * radius; iRow++) { // try to compute offset by 1 vector command
+        for (int iRow = 0; iRow < 2 * radius; iRow++) { // TODO try to compute offsets by 1 vector command
           memcpy(dst, src, lineSizeInBytes);
 
           src += lineSize; // adjust yOffset
@@ -214,17 +117,180 @@ bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image
         }
       }
 
-      //
-      if (++itCount % 10000 == 0) {
-        std::cout << itCount << " / " << totalCount << "\n";
-      }
     }
 
     std::cout << "load data: " << static_cast<double>(time1 - time0) / CLOCKS_PER_SEC << std::endl;
     std::cout << "classify: " << static_cast<double>(time2 - time1) / CLOCKS_PER_SEC << std::endl;
-
   }
 
+  bool classify(caffe::Net<float>* caffeNet, const std::string& preset, Int16Image3D::Pointer image16,
+  UInt8Image3D::Pointer imageMask, Image3DRegion& region, int radius, float spacingXY, int batchLength, int groupX,
+  int groupY, int classCount, bool isRgb, BinaryImage3D::Pointer& outImage)
+{
+  if (classCount < 1 && classCount > 3) {
+    std::cout << "classCount must be 1, 2, 3 or 4"; //todo 1?
+  }
+
+  int channels = isRgb ? 3 : 1;
+
+  std::cout << "isRgb: " << isRgb << std::endl;
+  std::cout << "channels: " << channels << std::endl;
+
+  UInt8Image3D::Pointer image8;
+  {
+    UInt8Image3D::Pointer imgage8Tmp = smartCastImage(preset, image16, imageMask);
+    image8 = preprocess(radius, spacingXY, isRgb, imgage8Tmp);
+  }
+  imageMask = preprocessBinary(radius, spacingXY, isRgb, imageMask);
+
+  agtk::writeImage(imageMask, "imageMaskPreprocessed.nrrd"); //todo debug
+
+  std::cout << "cast image to float" << std::endl;
+  typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
+  auto cast = Cast::New();
+  cast->SetInput(image8);
+  cast->Update();
+  FloatImage3D::Pointer image = cast->GetOutput();
+  if (imageMask != nullptr) {
+    if (image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion()) {
+      std::cout << "image->GetLargestPossibleRegion() != imageMask->GetLargestPossibleRegion() " << std::endl;
+      return false;
+    }
+  }
+
+  std::cout << "Calculating indices" << std::endl;
+  std::cout << "region in original spacing " << region << std::endl;
+
+  for (size_t i = 0; i < IMAGE_DIM_2; ++i) {
+    region.GetModifiableIndex()[i] *= spacingXY;
+    region.GetModifiableSize()[i] *= spacingXY;
+  }
+  std::cout << "region in modified spacing " << region << std::endl;
+
+  auto shrinkRegion = image->GetLargestPossibleRegion();
+  Image3DSize radius3D;
+  if (isRgb) {
+    radius3D = { radius, radius, 0 };
+  } else {
+    radius3D = { radius, radius, 1 };
+  }
+  shrinkRegion.ShrinkByRadius(radius3D);
+  region.Crop(shrinkRegion);
+
+  std::vector<Image3DIndex> indices;
+  std::cout << "region: " << region << std::endl;
+  if (imageMask.IsNotNull()) {
+    std::cout << "use mask" << std::endl;
+    itk::ImageRegionConstIterator<BinaryImage3D> itMask(imageMask, region);
+
+    int inMask = 0;//debug
+    for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
+      if (itMask.Get() != 0) {
+        //take central pixel of group
+        const auto& index = itMask.GetIndex();
+        inMask++;//debug
+        if (index[0] % groupX == groupX / 2 && index[1] % groupY == groupY / 2) {
+          indices.push_back(itMask.GetIndex());
+        }
+      }
+    }
+
+    std::cout << "in mask: " << inMask << std::endl;
+  } else {
+    std::cout << "not use mask" << std::endl;
+    itk::ImageRegionConstIterator<FloatImage3D> it(image, region);
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
+      //take central pixel of group
+      auto& index = it.GetIndex();
+      if (index[0] % groupX == groupX / 2 && index[1] % groupY == groupY / 2) {
+        indices.push_back(it.GetIndex());
+      }
+    }
+  }
+
+  //reorder like 'zxy'
+  //std::stable_sort(indices.begin(), indices.end(), [](agtk::Image3DIndex a, agtk::Image3DIndex b) // todo maybe use ordinal sort
+  //{
+  //  return a[2] != b[2] ? a[2] < b[2] : a[0] < b[0];
+  //});
+  const int totalCount = indices.size();
+
+  std::cout << "total count:" << totalCount << std::endl;
+
+  if (totalCount == 0) {
+    std::cout << "error: empty area" << std::endl;
+    return false;
+  }
+
+  auto classifiedImage = BinaryImage3D::New();
+  classifiedImage->CopyInformation(image);
+  classifiedImage->SetRegions(image->GetLargestPossibleRegion());
+  classifiedImage->Allocate();
+  classifiedImage->FillBuffer(0);
+
+  std::cout << "." << std::endl;
+
+  int posCount = 0;
+
+  std::cout << "Applying CNN in deploy config" << std::endl;
+
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+
+  auto time0 = clock();
+
+  for (int i = 0; i < totalCount / batchLength; ++i) {
+    classifyIthBatch(caffeNet, image, radius, batchLength, groupX, groupY, classCount, channels, indices, classifiedImage, posCount, i);
+
+    if ((i+1) % 10 == 0) {
+      std::cout << i + 1 << " of  " << totalCount / batchLength + 1 << std::endl;
+    }
+  }
+  auto time1 = clock();
+
+  std::cout << "rest batch" << std::endl;
+
+  if (totalCount % batchLength != 0) {
+    // precess last not full batch
+    int batchLengthRest = totalCount % batchLength;
+    int iRest = totalCount / batchLength;
+    int posCountRest = 0;
+
+    std::cout << " and rest: "<< iRest + 1 << " of  " << totalCount / batchLength + 1 << std::endl;
+    std::cout << "batchLengthRest: " << batchLengthRest << std::endl;
+
+    //reshape the net to fill last batch
+    const int height = radius * 2;
+    const int& width = height;
+    // from https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/caffe-users/hqXJovy2-DQ/y3Z24vv_vzQJ
+    caffeNet->blob_by_name("data")->Reshape(batchLengthRest, channels, height, width);
+    caffeNet->Reshape(); // optional -- the net will reshape automatically before a call to forward()
+
+    auto newShape = caffeNet->input_blobs()[0]->shape();
+    std::cout << "new shape: " << newShape[0] << ", " << newShape[1] << ", " << newShape[2] << ", " << newShape[3] << std::endl;
+
+    classifyIthBatch(caffeNet, image, radius, batchLengthRest, groupX, groupY, classCount, channels, indices, classifiedImage, posCountRest, iRest);
+
+    posCount += posCountRest;
+  }
+  auto time2 = clock();
+
+  if (totalCount / batchLength > 1){
+    std::cout << "performance for full-batched parts" << std::endl;
+    auto time = time1 - time0;
+    auto count = (totalCount / batchLength)*batchLength;
+    auto avgTime = static_cast<double>(count) / time;
+
+    std::cout << "avgerage time per one unit: " << avgTime; //todo
+    std::cout << "avgerage time per million units: " << avgTime*1e6;
+  } else {
+    std::cout << "performance for part-batched part" << std::endl;
+    auto time = time2 - time1;
+    auto count = totalCount % batchLength;
+    auto avgTime = static_cast<double>(count) / time;
+
+    std::cout << "avgerage time per one unit: " << avgTime << std::endl; //todo
+    std::cout << "avgerage time per million units: " << avgTime*1e6 << std::endl;
+  }
   std::cout << "positives:" << posCount << std::endl;
 
   //postprocess
