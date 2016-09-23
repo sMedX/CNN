@@ -8,7 +8,7 @@
 #include <vector>
 
 #include <itkImage.h>
-#include <itkTestingExtractSliceImageFilter.h>
+//#include <itkTestingExtractSliceImageFilter.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 
@@ -48,10 +48,10 @@ agtk::BinaryImage2D::Pointer getTile(const agtk::BinaryImage3D* image, const itk
   return ret;
 }
 
-itk::Image<itk::RGBPixel<UINT8>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize)
+itk::Image<itk::RGBPixel<char>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize)
 {
   typedef agtk::BinaryImage3D ImageType3D;
-  typedef itk::Image<itk::RGBPixel<UINT8>, 2> ImageType2D;
+  typedef itk::Image<itk::RGBPixel<char>, 2> ImageType2D;
 
   agtk::Image2DSize size2D = { 2 * halfSize, 2 * halfSize };
 

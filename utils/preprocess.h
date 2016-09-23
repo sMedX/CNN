@@ -1,12 +1,11 @@
 #include <itkConstantPadImageFilter.h>
 
-//#include "agtkAdaptiveHistogramEqualizationImageFilter.h"
-#include "agtkResampling.h"
 #include <itkResampleImageFilter.h>
 #include <itkWindowedSincInterpolateImageFunction.h>
 #include <itkConstantBoundaryCondition.h>
 
 #include "agtkTypes.h"
+#include "agtkResampling.h"
 
 namespace caffefication {
 using namespace agtk;
