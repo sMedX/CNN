@@ -154,7 +154,7 @@ inline UInt8Image3D::Pointer smartCastImage(const std::string& preset, Int16Imag
 }
 
 // Performs preprocessing befory cutting by tiles
-inline UInt8Image3D::Pointer preprocess(int radius, float spacingXY, bool isRgb, UInt8Image3D::Pointer input)
+inline UInt8Image3D::Pointer preprocess(unsigned int radius, float spacingXY, bool isRgb, UInt8Image3D::Pointer input)
 {
   UInt8Image3D::Pointer resampled = nullptr;
   //resample image by axial slices
@@ -169,13 +169,13 @@ inline UInt8Image3D::Pointer preprocess(int radius, float spacingXY, bool isRgb,
     resampled = resampling(input.GetPointer(), spacing);
   }
 
-  const Image3DSize size3D = { radius, radius, isRgb ? 1 : 0 };
+  const Image3DSize size3D = { radius, radius, isRgb ? 1u : 0u };
   std::cout << "padding by radius " << size3D << std::endl;
   return padImage(resampled == nullptr ? input : resampled, size3D); // todo maybe use one call of resample filter for resampling and padding
 }
 
 // Performs preprocessing befory cutting by tiles
-inline UInt8Image3D::Pointer preprocessBinary(int radius, float spacingXY, bool isRgb, UInt8Image3D::Pointer input)
+inline UInt8Image3D::Pointer preprocessBinary(unsigned int radius, float spacingXY, bool isRgb, UInt8Image3D::Pointer input)
 {
   UInt8Image3D::Pointer resampled = nullptr;
   //resample image by axial slices
@@ -190,7 +190,7 @@ inline UInt8Image3D::Pointer preprocessBinary(int radius, float spacingXY, bool 
     resampled = resamplingBinary(input.GetPointer(), spacing);
   }
 
-  const Image3DSize size3D = { radius, radius, isRgb ? 1 : 0 };
+  const Image3DSize size3D = { radius, radius, isRgb ? 1u : 0u };
   std::cout << "padding by radius " << size3D << std::endl;
   return padImage(resampled == nullptr ? input : resampled, size3D); // todo maybe use one call of resample filter for resampling and padding
 }

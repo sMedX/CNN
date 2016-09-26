@@ -22,18 +22,18 @@ imagesDir = os.environ['images']
 tilesDir = os.environ['tiles']
 snaphotPrefix = os.environ['snaps']
 
-classCount = '3'
+classCount = '2'
 makeTileLists = [python, 'make_sample_names_' + classCount + '-classes.py']
 preset = 'livertumors'
-ver = '29-ada-28_infogainFN10'##
+ver = 'a'##
 spacing = '0.782'
 spacingStr = 'orig' if spacing=='0' else spacing
-tilesParam = '-ada-28_infogainFN10'##
+tilesParam = ''##
 
-deviceId = '1'##
+deviceId = '0'##
 iters = '15000'##
 
-dir=os.path.join(caffeNets, preset, ver)
+dir=os.path.join(caffeNetsDir, preset, ver)
 print dir
 
 r = '32'
@@ -59,20 +59,21 @@ sigma = '4.000000'
 n = 2  # number of parts for cross-validation
 
 def main():
+    print 'cut ' + cut
+    retcode = subprocess.call([cut, '-listFile', samplesList, '-imageName', patient, '-labelName1', label,
+                     '-labelName2', 'livertumors_dark.nrrd', '-maskName', mask, '-radius', r, '-preset', preset,
+                     '-stride 3 3 3', '-spacingXY', spacing, spacing, '-strideNegative 4', '-folder', tilesFolder]) #.replace('/', '\\') for win
     
-    #retcode = subprocess.call([cut, '-listFile', samplesList, '-imageName', patient, '-labelName1', label,
-    #                 '-labelName2', 'livertumors_dark.nrrd', '-maskName', mask, '-radius', r, '-preset', preset,
-    #                 '-stride 0 0 0', '-spacingXY', spacing, spacing, '-strideNegative 1', '-folder', tilesFolder.replace('/', '\\')])
-    #
-    #if (retcode != 0):
-    #    print 'error. ', cut, ' exit with ', retcode
-    #    return
+    if (retcode != 0):
+        print 'error. ', cut, ' exit with ', retcode
+        return
 
     # make lists
+    os.makedirs(tilesFolder)
     makeSampleNames(int(classCount), tilesFolder, dir, imagesDir, samplesList, n)
 
     #matrix with penalties for infogain loss layer
-    createHMatrix()
+    #createHMatrix()
     
     for k in range(0, n):
         kn = str(k) + '-' + str(n)
@@ -127,7 +128,7 @@ def main():
         #tilesFolderAdaptive = tilesFolder+'-ada-'+ver
         #retcode = subprocess.call([cut, '-listFile', sampleTestListK, '-imageName', patient, '-labelName1', label,
         #             '-labelName2', outputCNN, '-maskName', mask, '-radius', r, '-preset', preset,
-        #             '-stride 1 1 1', '-spacingXY', spacing, spacing, '-strideNegative 4', '-folder', tilesFolderAdaptive.replace('/', '\\')])
+        #             '-stride 1 1 1', '-spacingXY', spacing, spacing, '-strideNegative 4', '-folder', tilesFolderAdaptive])#.replace('/', '\\') for win
 
         #if (retcode != 0):
         #    print 'error. ', cut, ' exit with ', retcode

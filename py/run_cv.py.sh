@@ -2,15 +2,15 @@
 
 #todo
 export cut=/root/host/CNN-utils-build/cutImageByTiles
-export caffe=
+export caffe=caffe
 export clas=
 export postproc=
 export valid=
-export python=/bin/python
+export python=python
 
-export nets=/root/host/
-export images=/root/host/data
-export tiles=/root/host/data
-export snaps=/root/host/
+export nets=/root/host/nets
+export images=/root/host/images
+export tiles=/root/host/tiles
+export snaps=/root/host/nets/snaps
 
 $python run_cv.py

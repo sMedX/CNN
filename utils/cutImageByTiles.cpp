@@ -7,6 +7,8 @@
 #include <omp.h>
 #include <vector>
 
+#include <boost/filesystem.hpp>
+
 #include <itkImage.h>
 //#include <itkTestingExtractSliceImageFilter.h>
 #include <itkMetaImageIOFactory.h>
@@ -18,9 +20,11 @@
 
 #include "preprocess.h"
 
+namespace fs = boost::filesystem;
+
 namespace caffefication {
 
-agtk::BinaryImage2D::Pointer getTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize)
+agtk::BinaryImage2D::Pointer getTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, unsigned int halfSize)
 {
   typedef agtk::BinaryImage3D ImageType3D;
   typedef agtk::BinaryImage2D ImageType2D;
@@ -48,7 +52,7 @@ agtk::BinaryImage2D::Pointer getTile(const agtk::BinaryImage3D* image, const itk
   return ret;
 }
 
-itk::Image<itk::RGBPixel<char>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, int halfSize)
+itk::Image<itk::RGBPixel<char>, 2>::Pointer getRGBTile(const agtk::BinaryImage3D* image, const itk::ImageBase<3>::IndexType& index, unsigned int halfSize)
 {
   typedef agtk::BinaryImage3D ImageType3D;
   typedef itk::Image<itk::RGBPixel<char>, 2> ImageType2D;
@@ -136,7 +140,7 @@ int main(int argc, char* argv[])
   std::string listFile;
   parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
 
-  int radius;
+  unsigned int radius;
   parser->GetValue("-radius", radius);
 
   Image3DSize stride = { 1, 1, 1 }; //default no-stride
@@ -189,12 +193,10 @@ int main(int argc, char* argv[])
 
   // set up output directories
   std::cout << outputFolder << std::endl;
-  system((std::string("md ") + outputFolder).c_str());
+  fs::create_directories(outputFolder);
 
   //itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
-  //omp_set_num_threads(24); // Use 24 threads
-
-  //int c = 0;
+  //omp_set_num_threads(1);
 
 #pragma omp parallel for
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
@@ -205,7 +207,7 @@ int main(int argc, char* argv[])
 
     // read images
     std::cout << "load image" << std::endl;
-    auto imageFile = inputDir + "\\" + imageName;
+    auto imageFile = inputDir + "/" + imageName;
     Int16Image3D::Pointer image16 = Int16Image3D::New();
     if (!readImage<Int16Image3D>(image16, imageFile)) {
       std::cout << "can't read " << imageFile;
@@ -213,7 +215,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "load label1" << std::endl;
-    auto labelFile1 = inputDir + "\\" + labelName1;
+    auto labelFile1 = inputDir + "/" + labelName1;
     std::cout << "labelFile1 " << labelFile1 << std::endl;
     BinaryImage3D::Pointer label1 = BinaryImage3D::New();
     if (!readImage(label1, labelFile1)) {
@@ -224,7 +226,7 @@ int main(int argc, char* argv[])
     std::cout << "load label2" << std::endl;
     BinaryImage3D::Pointer label2 = BinaryImage3D::New();
     if (isLabel2) {
-      auto labelFile2 = inputDir + "\\" + labelName2;
+      auto labelFile2 = inputDir + "/" + labelName2;
       std::cout << "labelFile2 " << labelFile2 << std::endl;
       if (!readImage(label2, labelFile2)) {
         std::cout << "can't read " << labelFile2 << ". label2 will not be used." << std::endl;
@@ -239,7 +241,7 @@ int main(int argc, char* argv[])
     BinaryImage3D::Pointer mask = BinaryImage3D::New();
     if (!isNoMask) {
       std::cout << "load mask" << std::endl;
-      auto maskFile = inputDir + "\\" + maskName;
+      auto maskFile = inputDir + "/" + maskName;
       std::cout << "maskFile " << maskFile << std::endl;
       if (!readImage(mask, maskFile)) {
         std::cout << "can't read " << maskFile << std::endl;
@@ -254,7 +256,7 @@ int main(int argc, char* argv[])
     BinaryImage3D::Pointer adaptive = BinaryImage3D::New();
     if (isAdaptiveClasses) {
       std::cout << "load adaptive" << std::endl;
-      auto adaptiveFile = inputDir + "\\" + adaptiveName; 
+      auto adaptiveFile = inputDir + "/" + adaptiveName; 
       std::cout << "adaptiveFile " << adaptiveFile << std::endl;
       if (!readImage(adaptive, adaptiveFile)) {
         std::cout << "can't read " << adaptiveFile << std::endl;
@@ -291,9 +293,8 @@ int main(int argc, char* argv[])
       int class2Count = 0;
 
       itk::ImageRegionConstIterator<BinaryImage3D> itMask(maskPreproc, wholeRegion);
-      std::cout << label1Preproc;
-      std::cout << label2Preproc;
-
+      //std::cout << label1Preproc;
+      //std::cout << label2Preproc;
 
       for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
         if (itMask.Get() != 0) {
@@ -325,20 +326,22 @@ int main(int argc, char* argv[])
 
       // set up output directories
       std::string iImageStr = inputDir.substr(inputDir.length() - 3);//take 3 last chars, e.g. 012
-      std::string outDir = outputFolder + "\\" + iImageStr + "\\";
-      system((std::string("md ") + outDir).c_str());
+      std::string outDir = outputFolder + "/" + iImageStr + "/";
 
+      std::cout << "output directories:" << std::endl;
+      std::vector<std::string> labels;
       if (isAdaptiveClasses) {
-        system((std::string("md ") + outDir + TP).c_str());
-        system((std::string("md ") + outDir + TN).c_str());
-        system((std::string("md ") + outDir + FP).c_str());
-        system((std::string("md ") + outDir + FN).c_str());
+        labels = { TP, TN, FP, FN };
       } else { //if 2 or 3 classes
-        system((std::string("md ") + outDir + "0").c_str());
-        system((std::string("md ") + outDir + "1").c_str());
+        labels = { "0", "1"};
         if (class2Count != 0) {
-          system((std::string("md ") + outDir + "2").c_str());
+          labels = { "0", "1", "2"};
         }
+      }
+      for (auto label : labels) {
+        std::string outDirLabel = outDir + label;
+        std::cout << outDirLabel << std::endl;
+        fs::create_directories(outDirLabel);
       }
 
       for (int j = 0; j < totalCount; ++j) {
@@ -368,7 +371,7 @@ int main(int argc, char* argv[])
             labelStr = label1I != 0 ? '1' : '0';
           }
         }
-        std::string filename = outDir + labelStr + "/" + indexStr + +"-s" + std::to_string(spacingXY) + ext;
+        std::string filename = outDir + indexStr + +"-s" + std::to_string(spacingXY) + ext;
 
         if (isRgb) {
           writeImage(getRGBTile(imagePreproc, index, radius).GetPointer(), filename);

@@ -10,6 +10,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVCL_CAN_STATIC_CONST_INIT_FLOAT=0")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lboost_system")
 endif()
 
 set(AGTK_CXX_STANDARD 11)
@@ -23,6 +24,12 @@ if( WIN32 )
  add_definitions(-DBOOST_ALL_DYN_LINK) 
 endif()
 
+
+# Boost filesystem
+set(Boost_LIBRARY_DIR "" CACHE PATH "")
+find_package(Boost 1.54 REQUIRED COMPONENTS system filesystem) #1.54 for 14.04 ubuntu
+include_directories(${Boost_INCLUDE_DIRS})
+ 
 # ITK
 find_package(ITK)
 include(${ITK_USE_FILE})
@@ -42,4 +49,4 @@ TARGET_LINK_LIBRARIES(cutImageByTiles mini-AGTK ${LIBRARIES} )
 #
 #set(SOURCES "cutImageBySlices.cpp" "preprocess.h")
 #add_executable(cutImageBySlices ${SOURCES})
-#TARGET_LINK_LIBRARIES(cutImageBySlices mini-AGTK ${LIBRARIES} )
+#TARGET_LINK_LIBRARIES(cutImageBySlices mini-AGTK ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
