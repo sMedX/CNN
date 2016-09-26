@@ -9,14 +9,21 @@ import numpy as np # for creation infogainHMatrix
 import caffe # for creation infogainHMatrix
 import time
 
-classCount = '3'
-cut = 'D:/alex/CNN-build4/utils/Release/CutImageByTiles.exe'
-makeTileLists = ['python.exe', 'make_sample_names_' + classCount + '-classes.py']
-train = 'D:/alex/ms-caffe-rep-copy1/Build/x64/Release/caffe.exe'
-clas = 'D:/alex/CNN-build4/classification/Release/classification.exe'
-postproc = 'D:/alex/CNN-build4/postprocessing/Release/postprocessing.exe'
-valid = 'D:/alex/CNN-build4/validation/Release/Validation.exe'
+# environ
+cut = os.environ['cut']
+train = os.environ['caffe']
+clas = os.environ['clas']
+postproc = os.environ['postproc']
+valid = os.environ['valid']
+python = os.environ['python']
 
+caffeNetsDir = os.environ['nets']
+imagesDir = os.environ['images']
+tilesDir = os.environ['tiles']
+snaphotPrefix = os.environ['snaps']
+
+classCount = '3'
+makeTileLists = [python, 'make_sample_names_' + classCount + '-classes.py']
 preset = 'livertumors'
 ver = '29-ada-28_infogainFN10'##
 spacing = '0.782'
@@ -26,7 +33,7 @@ tilesParam = '-ada-28_infogainFN10'##
 deviceId = '1'##
 iters = '15000'##
 
-dir=os.path.join('D:/alex/caffe-nets', preset, ver)
+dir=os.path.join(caffeNets, preset, ver)
 print dir
 
 r = '32'
@@ -35,11 +42,10 @@ label = preset + '.nrrd'
 mask = 'liver.nrrd'
 patient = 'patient.nrrd'
 
-imagesPath = 'D:/alex/images'
-tilesFolder = os.path.join('D:/alex/tiles', preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr + tilesParam)
-samplesList = os.path.join(imagesPath, preset, 'samplesList.txt') ##
+tilesFolder = os.path.join(tilesDir, preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr + tilesParam)
+samplesList = os.path.join(imagesDir, preset, 'samplesList.txt') ##
 
-deploy = os.path.join('D:/alex/caffe-nets', preset, ver, 'deploy.prototxt')
+deploy = os.path.join(caffeNetsDir, preset, ver, 'deploy.prototxt')
 start = [0, 0, 0]
 size = [512, 512, 1000]
 batchLength = '1024'
@@ -47,7 +53,6 @@ groupX = '3'
 groupY = '3'
 print preset,',v-', ver, ',spacing-', spacing
 
-snaphotPrefix='D:/Artem/caffe/snap'
 sigma = '4.000000'
 
 
@@ -64,7 +69,7 @@ def main():
     #    return
 
     # make lists
-    makeSampleNames(int(classCount), tilesFolder, dir, imagesPath, samplesList, n)
+    makeSampleNames(int(classCount), tilesFolder, dir, imagesDir, samplesList, n)
 
     #matrix with penalties for infogain loss layer
     createHMatrix()
