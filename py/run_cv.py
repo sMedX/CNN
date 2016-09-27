@@ -144,6 +144,8 @@ def makeSampleNames(classCount, pathTiles, pathOut, pathImages, samplesListFile,
     
     print 'pathTiles:', pathTiles
     print 'pathOut:', pathOut
+    if not os.path.exists(pathOut):
+        os.makedirs(pathOut)
     print 'pathImages:', pathImages
     print 'samplesListFile:', samplesListFile
     print 'n:', n
