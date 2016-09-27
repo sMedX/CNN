@@ -69,7 +69,8 @@ def main():
         return
 
     # make lists
-    os.makedirs(tilesFolder)
+    if not os.path.isdir(tilesFolder):
+        os.makedirs(tilesFolder)
     makeSampleNames(int(classCount), tilesFolder, dir, imagesDir, samplesList, n)
 
     #matrix with penalties for infogain loss layer
