@@ -371,7 +371,7 @@ int main(int argc, char* argv[])
             labelStr = label1I != 0 ? '1' : '0';
           }
         }
-        std::string filename = outDir + indexStr + +"-s" + std::to_string(spacingXY) + ext;
+        std::string filename = outDir +labelStr + "/" + indexStr + "-s" + std::to_string(spacingXY) + ext;
 
         if (isRgb) {
           writeImage(getRGBTile(imagePreproc, index, radius).GetPointer(), filename);
