@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
       writeImage(sliceImage.GetPointer(), filenameImage);
       writeImage(sliceLabel.GetPointer(), filenameLabel);
 
-      std::cout << z << "slice of " << iImage << " image" << std::endl;
+      std::cout << z << " slice of " << iImage << " image" << std::endl;
     }
   }
   return EXIT_SUCCESS;
