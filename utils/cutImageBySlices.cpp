@@ -139,11 +139,14 @@ int main(int argc, char* argv[])
       }
 
       auto indexStr = "n" + std::to_string(iImage) + "_z" + std::to_string(z);
-      fs::create_directories(outputFolder + "/images/");
-      fs::create_directories(outputFolder + "/labels/");
+      auto dirImages = outputFolder + "/images/";
+      auto dirLabels = outputFolder + "/labels/";
 
-      std::string filenameImage = outputFolder + "images/" + indexStr + ext;
-      std::string filenameLabel = outputFolder + "labels/" + indexStr + ext;
+      fs::create_directories(dirImages);
+      fs::create_directories(dirLabels);
+
+      std::string filenameImage = dirImages + indexStr + ext;
+      std::string filenameLabel = dirLabels + indexStr + ext;
 
       writeImage(sliceImage.GetPointer(), filenameImage);
       writeImage(sliceLabel.GetPointer(), filenameLabel);
