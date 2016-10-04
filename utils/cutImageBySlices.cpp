@@ -2,6 +2,8 @@
 #include <fstream>
 #include <omp.h>
 
+#include <boost/filesystem.hpp>
+
 #include <itkImage.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
@@ -13,6 +15,7 @@
 
 #include "preprocess.h"
 
+namespace fs = boost::filesystem;
 
 template <typename TPixel>
 itk::SmartPointer<itk::Image<TPixel, 2>> exctractSlice(itk::Image<TPixel, 3> * image16, int z)
@@ -35,6 +38,7 @@ itk::SmartPointer<itk::Image<TPixel, 2>> exctractSlice(itk::Image<TPixel, 3> * i
 int main(int argc, char* argv[])
 {
   using namespace agtk;
+  using namespace caffefication;
 
   const std::string ext = ".png";
 
@@ -53,10 +57,10 @@ int main(int argc, char* argv[])
   parser->SetCommandLineArguments(argc, argv);
 
   std::string imageName;
-  parser->GetValue("-imageName", imageName);
+  parser->GetValue("-imageName", imageName); // patient.nrrd for example
 
   std::string labelName1;
-  parser->GetValue("-labelName1", labelName1); //class under label '1'
+  parser->GetValue("-labelName1", labelName1); //class under label '1', livertumors for example
 
   std::string listFile;
   parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
@@ -85,7 +89,8 @@ int main(int argc, char* argv[])
   std::cout << "inputData.size() " << inputDirs.size() << std::endl;
 
   // set up output directories
-  system((std::string("md ") + outputFolder).c_str());
+  std::cout << outputFolder << std::endl;
+  fs::create_directories(outputFolder);
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
   omp_set_num_threads(24); // Use 24 threads
@@ -96,10 +101,9 @@ int main(int argc, char* argv[])
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
     auto inputDir = inputDirs[iImage];
 
-
     // read images
     std::cout << "load image" << std::endl;
-    auto imageFile = inputDir + "\\" + imageName;
+    auto imageFile = inputDir + "/" + imageName;
     Int16Image3D::Pointer image16 = Int16Image3D::New();
     if (!readImage<Int16Image3D>(image16, imageFile)) {
       std::cout << "can't read " << imageFile;
@@ -107,7 +111,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "load label1" << std::endl;
-    auto labelFile1 = inputDir + "\\" + labelName1;
+    auto labelFile1 = inputDir + "/" + labelName1;
     std::cout << "labelFile1 " << labelFile1 << std::endl;
     BinaryImage3D::Pointer label1 = BinaryImage3D::New();
     if (!readImage(label1, labelFile1)) {
@@ -117,7 +121,7 @@ int main(int argc, char* argv[])
 
     UInt8Image3D::SizeType inputSize = image16->GetLargestPossibleRegion().GetSize();
 
-    const int outputSize = 224;
+    const int outputSize = 256;
     double spacingXY = image16->GetSpacing()[0] * (static_cast<double>(inputSize[0]) / outputSize);
 
     std::cout << "preprocess image" << std::endl;
@@ -136,11 +140,11 @@ int main(int argc, char* argv[])
       }
 
       auto indexStr = "n" + std::to_string(iImage) + "_z" + std::to_string(z);
-      system(("md " + outputFolder + "images\\").c_str());
-      system(("md " + outputFolder + "labels\\").c_str());
+      fs::create_directories(outputFolder + "images/");
+      fs::create_directories(outputFolder + "labels/");
 
-      std::string filenameImage = outputFolder + "images\\" + indexStr + ext;
-      std::string filenameLabel = outputFolder + "labels\\" + indexStr + ext;
+      std::string filenameImage = outputFolder + "images/" + indexStr + ext;
+      std::string filenameLabel = outputFolder + "labels/" + indexStr + ext;
 
       writeImage(sliceImage.GetPointer(), filenameImage);
       writeImage(sliceLabel.GetPointer(), filenameLabel);

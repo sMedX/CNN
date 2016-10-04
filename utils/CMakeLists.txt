@@ -47,6 +47,6 @@ add_executable(cutImageByTiles ${SOURCES})
 TARGET_LINK_LIBRARIES(cutImageByTiles mini-AGTK ${LIBRARIES} )
 
 #
-#set(SOURCES "cutImageBySlices.cpp" "preprocess.h")
-#add_executable(cutImageBySlices ${SOURCES})
-#TARGET_LINK_LIBRARIES(cutImageBySlices mini-AGTK ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
+set(SOURCES "cutImageBySlices.cpp" "preprocess.h")
+add_executable(cutImageBySlices ${SOURCES})
+TARGET_LINK_LIBRARIES(cutImageBySlices mini-AGTK ${LIBRARIES})
