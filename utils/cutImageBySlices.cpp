@@ -71,10 +71,14 @@ int main(int argc, char* argv[])
   std::string outputFolder;
   parser->GetValue("-folder", outputFolder);
 
+  int outSize = 256;
+  parser->GetValue("-outSize", outSize);
+
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "imageName  " << imageName << std::endl;
   std::cout << "labelName1  " << labelName1 << std::endl;
   std::cout << "output folder  " << outputFolder << std::endl;
+  std::cout << "outSize  " << outSize << std::endl;
 
   std::cout << std::endl;
   std::cout << "preset " << preset << std::endl;
@@ -119,11 +123,6 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    UInt8Image3D::SizeType inputSize = image16->GetLargestPossibleRegion().GetSize();
-
-    const int outputSize = 256;
-    double spacingXY = image16->GetSpacing()[0] * (static_cast<double>(inputSize[0]) / outputSize);
-
     std::cout << "preprocess image" << std::endl;
     auto image8 = smartCastImage(preset, image16, nullptr);
 
@@ -131,8 +130,8 @@ int main(int argc, char* argv[])
       auto sliceImage = exctractSlice(image8.GetPointer(), z);
       auto sliceLabel = exctractSlice(label1.GetPointer(), z);
 
-      sliceImage = resampling(sliceImage.GetPointer(), spacingXY);
-      sliceLabel = resampling(sliceLabel.GetPointer(), spacingXY);
+      sliceImage = resizeXY(sliceImage.GetPointer(), outSize);
+      sliceLabel = resizeXY(sliceLabel.GetPointer(), outSize);
 
       itk::ImageRegionIterator<UInt8Image2D> it(sliceLabel, sliceLabel->GetLargestPossibleRegion());
       for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
@@ -140,8 +139,8 @@ int main(int argc, char* argv[])
       }
 
       auto indexStr = "n" + std::to_string(iImage) + "_z" + std::to_string(z);
-      fs::create_directories(outputFolder + "images/");
-      fs::create_directories(outputFolder + "labels/");
+      fs::create_directories(outputFolder + "/images/");
+      fs::create_directories(outputFolder + "/labels/");
 
       std::string filenameImage = outputFolder + "images/" + indexStr + ext;
       std::string filenameLabel = outputFolder + "labels/" + indexStr + ext;

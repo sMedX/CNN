@@ -55,6 +55,37 @@ typename TImage::Pointer resampling(const TImage* image, typename TImage::Spacin
 
 //----------------------------------------------------------------------------
 template <typename TImage>
+typename TImage::Pointer resizeXY(const TImage* image, int outSize)
+{
+  typedef TImage ImageType;
+
+  typename TImage::SizeType outSize3D;
+  outSize3D[0] = outSize;
+  outSize3D[1] = outSize;
+  outSize3D[1] = image->GetLargestPossibleRegion().GetSize(2);
+
+  const unsigned int WindowRadius = 2;
+  typedef itk::Function::HammingWindowFunction<WindowRadius> WindowFunctionType;
+  typedef itk::ConstantBoundaryCondition<ImageType> BoundaryConditionType;
+  typedef itk::WindowedSincInterpolateImageFunction<ImageType, WindowRadius, WindowFunctionType, BoundaryConditionType, double> InterpolatorType;
+  typename InterpolatorType::Pointer interpolator = InterpolatorType::New();
+
+  typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleImageFilterType;
+
+  typename ResampleImageFilterType::Pointer resample = ResampleImageFilterType::New();
+  resample->SetInterpolator(interpolator);
+  resample->SetDefaultPixelValue(0);
+  resample->SetSize(outSize3D);
+  resample->SetOutputOrigin(image->GetOrigin());
+  resample->SetInput(image);
+  resample->Update();
+
+  typename ImageType::Pointer output = resample->GetOutput();
+
+  return output;
+}
+//----------------------------------------------------------------------------
+template <typename TImage>
 typename TImage::Pointer resampling(TImage* image, typename TImage::SpacingType outSpacing)
 {
   return resampling(const_cast<const TImage*>(image), outSpacing);
