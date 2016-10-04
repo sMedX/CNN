@@ -26,7 +26,7 @@ classCount = '2'
 makeTileLists = [python, 'make_sample_names_' + classCount + '-classes.py']
 preset = 'livertumors'
 ver = 'a'##
-spacing = '0.782'
+spacing = '0.8'
 spacingStr = 'orig' if spacing=='0' else spacing
 tilesParam = ''##
 
@@ -67,12 +67,13 @@ def main():
     if (retcode != 0):
         print 'error. ', cut, ' exit with ', retcode
         return
-
+    
     # make lists
     if not os.path.isdir(tilesFolder):
         os.makedirs(tilesFolder)
     makeSampleNames(int(classCount), tilesFolder, dir, imagesDir, samplesList, n)
 
+    return#debug
     #matrix with penalties for infogain loss layer
     #createHMatrix()
     
