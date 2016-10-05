@@ -54,15 +54,15 @@ typename TImage::Pointer resampling(const TImage* image, typename TImage::Spacin
 }
 
 //----------------------------------------------------------------------------
-template <typename TImage>
-typename TImage::Pointer resizeXY(const TImage* image, int outSize)
+template <typename TPixel>
+typename itk::Image <TPixel, 2>::Pointer resize2D(const itk::Image <TPixel, 2>* image, int outSize)
 {
-  typedef TImage ImageType;
+  typedef itk::Image <TPixel, 2> ImageType;
 
-  typename TImage::SizeType outSize3D;
-  outSize3D[0] = outSize;
-  outSize3D[1] = outSize;
-  outSize3D[1] = image->GetLargestPossibleRegion().GetSize(2);
+  typename ImageType::SizeType outSize2D = { outSize, outSize };
+  typename ImageType::SpacingType outSpacing2D;
+  outSpacing2D[0] = image->GetSpacing()[0] * 2;
+  outSpacing2D[1] = image->GetSpacing()[1] * 2;//todo debug
 
   const unsigned int WindowRadius = 2;
   typedef itk::Function::HammingWindowFunction<WindowRadius> WindowFunctionType;
@@ -75,7 +75,8 @@ typename TImage::Pointer resizeXY(const TImage* image, int outSize)
   typename ResampleImageFilterType::Pointer resample = ResampleImageFilterType::New();
   resample->SetInterpolator(interpolator);
   resample->SetDefaultPixelValue(0);
-  resample->SetSize(outSize3D);
+  resample->SetOutputSpacing(outSpacing2D);
+  resample->SetSize(outSize2D);
   resample->SetOutputOrigin(image->GetOrigin());
   resample->SetInput(image);
   resample->Update();

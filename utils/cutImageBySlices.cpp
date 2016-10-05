@@ -62,6 +62,9 @@ int main(int argc, char* argv[])
   std::string labelName1;
   parser->GetValue("-labelName1", labelName1); //class under label '1', livertumors for example
 
+  std::string inputFolder;
+  parser->GetValue("-inFolder", inputFolder); // directory, that contains subdirectory listed in listFile
+
   std::string listFile;
   parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
 
@@ -69,13 +72,14 @@ int main(int argc, char* argv[])
   parser->GetValue("-preset", preset);
 
   std::string outputFolder;
-  parser->GetValue("-folder", outputFolder);
+  parser->GetValue("-outFolder", outputFolder);
 
   int outSize = 256;
   parser->GetValue("-outSize", outSize);
 
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "imageName  " << imageName << std::endl;
+  std::cout << "input folder  " << inputFolder << std::endl;
   std::cout << "labelName1  " << labelName1 << std::endl;
   std::cout << "output folder  " << outputFolder << std::endl;
   std::cout << "outSize  " << outSize << std::endl;
@@ -88,12 +92,11 @@ int main(int argc, char* argv[])
   std::string line;
 
   while (std::getline(infile, line)) {
-    inputDirs.push_back(line);
+    inputDirs.push_back(inputFolder + line);
   }
   std::cout << "inputData.size() " << inputDirs.size() << std::endl;
 
   // set up output directories
-  std::cout << outputFolder << std::endl;
   fs::create_directories(outputFolder);
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
@@ -125,13 +128,14 @@ int main(int argc, char* argv[])
 
     std::cout << "preprocess image" << std::endl;
     auto image8 = smartCastImage(preset, image16, nullptr);
+    std::cout << "done" << std::endl;
 
     for (size_t z = 0; z < image16->GetLargestPossibleRegion().GetSize(2); z++) {
       auto sliceImage = exctractSlice(image8.GetPointer(), z);
       auto sliceLabel = exctractSlice(label1.GetPointer(), z);
 
-      sliceImage = resizeXY(sliceImage.GetPointer(), outSize);
-      sliceLabel = resizeXY(sliceLabel.GetPointer(), outSize);
+      sliceImage = resize2D(sliceImage.GetPointer(), outSize);
+      sliceLabel = resize2D(sliceLabel.GetPointer(), outSize);
 
       itk::ImageRegionIterator<UInt8Image2D> it(sliceLabel, sliceLabel->GetLargestPossibleRegion());
       for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
