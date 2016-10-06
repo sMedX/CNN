@@ -83,14 +83,11 @@ int main(int argc, char* argv[])
   std::cout << "labelName1  " << labelName1 << std::endl;
   std::cout << "output folder  " << outputFolder << std::endl;
   std::cout << "outSize  " << outSize << std::endl;
-
-  std::cout << std::endl;
   std::cout << "preset " << preset << std::endl;
-  std::vector<std::string> inputDirs;
 
+  std::vector<std::string> inputDirs;
   std::ifstream infile(listFile);
   std::string line;
-
   while (std::getline(infile, line)) {
     inputDirs.push_back(inputFolder + line);
   }
@@ -101,8 +98,6 @@ int main(int argc, char* argv[])
 
   itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
   omp_set_num_threads(24); // Use 24 threads
-
-  //int c = 0;
 
 #pragma omp parallel for
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
@@ -130,12 +125,14 @@ int main(int argc, char* argv[])
     auto image8 = smartCastImage(preset, image16, nullptr);
     std::cout << "done" << std::endl;
 
+    itk::ImageBase<2>::SizeType outSize2D = { outSize, outSize };
+
     for (size_t z = 0; z < image16->GetLargestPossibleRegion().GetSize(2); z++) {
       auto sliceImage = exctractSlice(image8.GetPointer(), z);
       auto sliceLabel = exctractSlice(label1.GetPointer(), z);
 
-      sliceImage = resize2D(sliceImage.GetPointer(), outSize);
-      sliceLabel = resize2D(sliceLabel.GetPointer(), outSize);
+      sliceImage = resize(sliceImage.GetPointer(), outSize2D);
+      sliceLabel = resizeBinary(sliceLabel.GetPointer(), outSize2D);
 
       itk::ImageRegionIterator<UInt8Image2D> it(sliceLabel, sliceLabel->GetLargestPossibleRegion());
       for (it.GoToBegin(); !it.IsAtEnd(); ++it) {

@@ -11,9 +11,10 @@
 namespace agtk
 {
 //----------------------------------------------------------------------------
-// 0 in outSpacing mean that this axis will not resampled
+// performs resampling of input image to specified spacing
+// 0 in outSpacing[i] means spacing by the dimension stays same 
 template <typename TImage>
-typename TImage::Pointer resampling(const TImage* image, typename TImage::SpacingType outSpacing)
+typename TImage::Pointer resample(const TImage* image, typename TImage::SpacingType outSpacing)
 {
   typedef TImage ImageType;
 
@@ -53,51 +54,18 @@ typename TImage::Pointer resampling(const TImage* image, typename TImage::Spacin
   return output;
 }
 
-//----------------------------------------------------------------------------
-template <typename TPixel>
-typename itk::Image <TPixel, 2>::Pointer resize2D(const itk::Image <TPixel, 2>* image, int outSize)
-{
-  typedef itk::Image <TPixel, 2> ImageType;
-
-  typename ImageType::SizeType outSize2D = { outSize, outSize };
-  typename ImageType::SpacingType outSpacing2D;
-  outSpacing2D[0] = image->GetSpacing()[0] * 2;
-  outSpacing2D[1] = image->GetSpacing()[1] * 2;//todo debug
-
-  const unsigned int WindowRadius = 2;
-  typedef itk::Function::HammingWindowFunction<WindowRadius> WindowFunctionType;
-  typedef itk::ConstantBoundaryCondition<ImageType> BoundaryConditionType;
-  typedef itk::WindowedSincInterpolateImageFunction<ImageType, WindowRadius, WindowFunctionType, BoundaryConditionType, double> InterpolatorType;
-  typename InterpolatorType::Pointer interpolator = InterpolatorType::New();
-
-  typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleImageFilterType;
-
-  typename ResampleImageFilterType::Pointer resample = ResampleImageFilterType::New();
-  resample->SetInterpolator(interpolator);
-  resample->SetDefaultPixelValue(0);
-  resample->SetOutputSpacing(outSpacing2D);
-  resample->SetSize(outSize2D);
-  resample->SetOutputOrigin(image->GetOrigin());
-  resample->SetInput(image);
-  resample->Update();
-
-  typename ImageType::Pointer output = resample->GetOutput();
-
-  return output;
-}
-//----------------------------------------------------------------------------
+// non-const overload-wrapper
 template <typename TImage>
-typename TImage::Pointer resampling(TImage* image, typename TImage::SpacingType outSpacing)
+typename TImage::Pointer resample(TImage* image, typename TImage::SpacingType outSpacing)
 {
-  return resampling(const_cast<const TImage*>(image), outSpacing);
+  return resample(const_cast<const TImage*>(image), outSpacing);
 }
 
-// Use this function if need binary image as result
-template <unsigned int VDim>
-typename itk::Image<UInt8Pixel, VDim>::Pointer resamplingBinary(itk::Image<UInt8Pixel, VDim>* image,
-  typename itk::ImageBase<VDim>::SpacingType outSpacing)
+// Use this function if need good binary image as result
+template <unsigned int VDim, typename TPixel>
+typename itk::Image<TPixel, VDim>::Pointer resampleBinary(itk::Image<TPixel, VDim>* image, typename itk::ImageBase<VDim>::SpacingType outSpacing)
 {
-  typedef itk::Image<UInt8Pixel, VDim> ImageType;
+  typedef itk::Image<TPixel, VDim> ImageType;
 
   typename ImageType::SizeType inSize = image->GetLargestPossibleRegion().GetSize();
   typename ImageType::SpacingType inSpacing = image->GetSpacing();
@@ -106,8 +74,7 @@ typename itk::Image<UInt8Pixel, VDim>::Pointer resamplingBinary(itk::Image<UInt8
   for (int n = 0; n < VDim; ++n) {
     if (outSpacing[n] > 0) {
       outSize[n] = inSize[n] * (inSpacing[n] / outSpacing[n]) - 1;
-    }
-    else {
+    } else {
       outSpacing[n] = inSpacing[n];
       outSize[n] = inSize[n];
     }
@@ -115,7 +82,7 @@ typename itk::Image<UInt8Pixel, VDim>::Pointer resamplingBinary(itk::Image<UInt8
 
   typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleImageFilterType;
 
-  typedef itk::NearestNeighborInterpolateImageFunction<BinaryImage3D> Interpolator;
+  typedef itk::NearestNeighborInterpolateImageFunction<ImageType> Interpolator;
   auto interpolator = Interpolator::New();
 
   typename ResampleImageFilterType::Pointer resample = ResampleImageFilterType::New();
@@ -132,25 +99,92 @@ typename itk::Image<UInt8Pixel, VDim>::Pointer resamplingBinary(itk::Image<UInt8
   return output;
 }
 
+// Use this function if image with exactly same geometry as result
 template <typename TImage>
-typename TImage::Pointer resamplingLike(const TImage* image, const TImage* referenceImage)
+typename TImage::Pointer resample(const TImage* image, const TImage* referenceImage)
 {
   typedef TImage ImageType;
 
   typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleImageFilterType;
 
-  auto nn_interpolator = itk::NearestNeighborInterpolateImageFunction<ImageType>::New();
+  auto interpolator = itk::NearestNeighborInterpolateImageFunction<ImageType>::New();
 
   auto resampleFilter = ResampleImageFilterType::New();
   resampleFilter->SetInput(image);
   resampleFilter->SetReferenceImage(referenceImage);
   resampleFilter->SetUseReferenceImage(true);
-  resampleFilter->SetInterpolator(nn_interpolator);
+  resampleFilter->SetInterpolator(interpolator);
   resampleFilter->SetDefaultPixelValue(0);
 
   resampleFilter->UpdateLargestPossibleRegion();
   return resampleFilter->GetOutput();
 }
+
+//----------------------------------------------------------------------------
+template <unsigned int VDim, typename TPixel>
+typename itk::Image <TPixel, VDim>::Pointer resize(const itk::Image <TPixel, VDim>* image, typename itk::ImageBase<VDim>::SizeType outSize)
+{
+  typedef itk::Image <TPixel, VDim> ImageType;
+
+  auto inSize = image->GetLargestPossibleRegion().GetSize();
+  typename ImageType::SpacingType outSpacing;
+  for (size_t i = 0; i < VDim; i++) {
+    outSpacing[i] = image->GetSpacing()[i] * inSize[i] / outSize[i];
+  }
+
+  const unsigned int WindowRadius = 2;
+  typedef itk::Function::HammingWindowFunction<WindowRadius> WindowFunctionType;
+  typedef itk::ConstantBoundaryCondition<ImageType> BoundaryConditionType;
+  typedef itk::WindowedSincInterpolateImageFunction<ImageType, WindowRadius, WindowFunctionType, BoundaryConditionType, double> InterpolatorType;
+  typename InterpolatorType::Pointer interpolator = InterpolatorType::New();
+
+  typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleImageFilterType;
+
+  typename ResampleImageFilterType::Pointer resample = ResampleImageFilterType::New();
+  resample->SetInterpolator(interpolator);
+  resample->SetDefaultPixelValue(0);
+  resample->SetOutputSpacing(outSpacing);
+  resample->SetSize(outSize);
+  resample->SetOutputOrigin(image->GetOrigin());
+  resample->SetInput(image);
+  resample->Update();
+
+  typename ImageType::Pointer output = resample->GetOutput();
+
+  return output;
+}
+
+//----------------------------------------------------------------------------
+template <unsigned int VDim, typename TPixel>
+typename itk::Image <TPixel, VDim>::Pointer resizeBinary(const itk::Image <TPixel, VDim>* image, typename itk::ImageBase<VDim>::SizeType outSize)
+{
+  typedef itk::Image <TPixel, VDim> ImageType;
+
+  auto inSize = image->GetLargestPossibleRegion().GetSize();
+  typename ImageType::SpacingType outSpacing;
+  for (size_t i = 0; i < VDim; i++) {
+    outSpacing[i] = image->GetSpacing()[i] * inSize[i] / outSize[i];
+  }
+
+  typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleImageFilterType;
+
+  typedef itk::NearestNeighborInterpolateImageFunction<ImageType> Interpolator;
+  auto interpolator = Interpolator::New();
+
+  typename ResampleImageFilterType::Pointer resample = ResampleImageFilterType::New();
+  resample->SetInterpolator(interpolator);
+  resample->SetDefaultPixelValue(0);
+  resample->SetOutputSpacing(outSpacing);
+  resample->SetSize(outSize);
+  resample->SetOutputOrigin(image->GetOrigin());
+  resample->SetInput(image);
+  resample->Update();
+
+  typename ImageType::Pointer output = resample->GetOutput();
+
+  return output;
+}
+
 }
 
 #endif // __agtkResampling_h

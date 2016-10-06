@@ -10,7 +10,6 @@
 #include <boost/filesystem.hpp>
 
 #include <itkImage.h>
-//#include <itkTestingExtractSliceImageFilter.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 

@@ -10,48 +10,6 @@
 namespace caffefication {
 using namespace agtk;
 
-//----------------------------------------------------------------------------
-// 0 in outSpacing mean that this axis will not resampled
-template <typename TImage>
-typename TImage::Pointer resampling(const TImage* image, typename TImage::SpacingType outSpacing)
-{
-  typedef TImage ImageType;
-
-  typename ImageType::SizeType inSize = image->GetLargestPossibleRegion().GetSize();
-  typename ImageType::SpacingType inSpacing = image->GetSpacing();
-  typename ImageType::SizeType outSize;
-
-  for (int n = 0; n < ImageType::ImageDimension; ++n) {
-    if (outSpacing[n] > 0) {
-      outSize[n] = inSize[n] * (inSpacing[n] / outSpacing[n]) - 1;
-    } else {
-      outSpacing[n] = inSpacing[n];
-      outSize[n] = inSize[n];
-    }
-  }
-
-  const unsigned int WindowRadius = 2;
-  typedef itk::Function::HammingWindowFunction<WindowRadius> WindowFunctionType;
-  typedef itk::ConstantBoundaryCondition<ImageType> BoundaryConditionType;
-  typedef itk::WindowedSincInterpolateImageFunction<ImageType, WindowRadius, WindowFunctionType, BoundaryConditionType, double> InterpolatorType;
-  typename InterpolatorType::Pointer interpolator = InterpolatorType::New();
-
-  typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleImageFilterType;
-
-  typename ResampleImageFilterType::Pointer resample = ResampleImageFilterType::New();
-  resample->SetInterpolator(interpolator);
-  resample->SetDefaultPixelValue(0);
-  resample->SetOutputSpacing(outSpacing);
-  resample->SetSize(outSize);
-  resample->SetOutputOrigin(image->GetOrigin());
-  resample->SetInput(image);
-  resample->Update();
-
-  typename ImageType::Pointer output = resample->GetOutput();
-
-  return output;
-}
-
 inline BinaryImage3D::Pointer padImage(const BinaryImage3D* image, const itk::ImageBase<3>::SizeType& outputRegion)
 {
   typedef BinaryImage3D ImageType;
@@ -166,7 +124,7 @@ inline UInt8Image3D::Pointer preprocess(unsigned int radius, float spacingXY, bo
     spacing[1] = spacingXY;
     spacing[2] = input->GetSpacing()[2];
 
-    resampled = resampling(input.GetPointer(), spacing);
+    resampled = resample(input.GetPointer(), spacing);
   }
 
   const Image3DSize size3D = { radius, radius, isRgb ? 1u : 0u };
@@ -187,7 +145,7 @@ inline UInt8Image3D::Pointer preprocessBinary(unsigned int radius, float spacing
     spacing[1] = spacingXY;
     spacing[2] = input->GetSpacing()[2];
 
-    resampled = resamplingBinary(input.GetPointer(), spacing);
+    resampled = resampleBinary(input.GetPointer(), spacing);
   }
 
   const Image3DSize size3D = { radius, radius, isRgb ? 1u : 0u };
