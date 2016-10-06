@@ -29,7 +29,10 @@ set(SOURCES "agtkCommandLineArgumentParser.cxx"
 "agtkIO.cxx" 
 "agtkIO.h" 
 "agtkTypes.h"
-"agtkResampling.h")
+"agtkResampling.h"
+"agtkBinaryImageUtilities.h"
+"agtkBinaryImageUtilities.cxx"
+"agtkImageFilteringShortcuts.h")
 
 add_library(mini-AGTK ${SOURCES})
 

@@ -14,6 +14,7 @@
 #include "agtkCommandLineArgumentParser.h"
 
 #include "preprocess.h"
+#include <agtkBinaryImageUtilities.h>
 
 namespace fs = boost::filesystem;
 
@@ -127,7 +128,25 @@ int main(int argc, char* argv[])
 
     itk::ImageBase<2>::SizeType outSize2D = { outSize, outSize };
 
-    for (size_t z = 0; z < image16->GetLargestPossibleRegion().GetSize(2); z++) {
+    bool isValidRegion;
+    auto region = getBinaryMaskBoundingBoxRegion(label1, &isValidRegion);
+    if (!isValidRegion) {
+      break;
+    }
+
+    //expand region a little bit
+    const int slicePadding = 2; //pad region by z axis
+    const int maxSlice = image8->GetLargestPossibleRegion().GetUpperIndex()[2];
+    int startSlice = region.GetIndex()[2] - slicePadding;
+    if (startSlice < 0) {
+      startSlice = 0;
+    }
+    int endSlice = region.GetUpperIndex()[2] + slicePadding;
+    if (endSlice > maxSlice) {
+      endSlice = maxSlice;
+    }
+
+    for (size_t z = startSlice; z <= endSlice; z++) {
       auto sliceImage = exctractSlice(image8.GetPointer(), z);
       auto sliceLabel = exctractSlice(label1.GetPointer(), z);
 
