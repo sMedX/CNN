@@ -60,9 +60,9 @@ int main(int argc, char* argv[])
   std::string imageName;
   parser->GetValue("-imageName", imageName); // patient.nrrd for example
 
-  std::string labelName1;
-  parser->GetValue("-labelName1", labelName1); //class under label '1', livertumors for example
-
+  std::vector<std::string> labelNames;
+  parser->GetValue("-labelNames", labelNames); //classes in forward order. 'liver.nrrd livertumors.nrrd' for example. the more last label is more important
+  
   std::string inputFolder;
   parser->GetValue("-inFolder", inputFolder); // directory, that contains subdirectory listed in listFile
 
@@ -81,10 +81,19 @@ int main(int argc, char* argv[])
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "imageName  " << imageName << std::endl;
   std::cout << "input folder  " << inputFolder << std::endl;
-  std::cout << "labelName1  " << labelName1 << std::endl;
+  std::cout << "labelNames  ";
+  for (auto labelName : labelNames) {
+    std::cout << labelName << " ";
+  }
+  std::cout << std::endl;
   std::cout << "output folder  " << outputFolder << std::endl;
   std::cout << "outSize  " << outSize << std::endl;
   std::cout << "preset " << preset << std::endl;
+
+  if (labelNames.empty()) {
+    std::cout << "error: labelNames.empty()" << std::endl;
+    return EXIT_FAILURE;
+  }
 
   std::vector<std::string> inputDirs;
   std::ifstream infile(listFile);
@@ -113,13 +122,16 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    std::cout << "load label1" << std::endl;
-    auto labelFile1 = inputDir + "/" + labelName1;
-    std::cout << "labelFile1 " << labelFile1 << std::endl;
-    BinaryImage3D::Pointer label1 = BinaryImage3D::New();
-    if (!readImage(label1, labelFile1)) {
-      std::cout << "can't read " << labelFile1;
-      continue;
+    std::vector<BinaryImage3D::Pointer> labels;
+    for (auto labelName : labelNames) {
+      auto labelFile = inputDir + "/" + labelName;
+      std::cout << "load labelFile " << labelFile << std::endl;
+      BinaryImage3D::Pointer label = BinaryImage3D::New();
+      if (!readImage(label, labelFile)) {
+        std::cout << "can't read " << labelFile;
+        continue;
+      }
+      labels.push_back(label);
     }
 
     std::cout << "preprocess image" << std::endl;
@@ -128,36 +140,55 @@ int main(int argc, char* argv[])
 
     itk::ImageBase<2>::SizeType outSize2D = { outSize, outSize };
 
-    bool isValidRegion;
-    auto region = getBinaryMaskBoundingBoxRegion(label1, &isValidRegion);
-    if (!isValidRegion) {
+    //find bounding box by z axis
+    const long maxSlice = image8->GetLargestPossibleRegion().GetUpperIndex()[2];
+
+    long startSlice = maxSlice, endSlice = 0;
+    for (auto label : labels) {
+      bool isValidRegion;
+      auto region = getBinaryMaskBoundingBoxRegion(label, &isValidRegion);
+      if (isValidRegion) {
+        startSlice = std::min(startSlice, region.GetIndex()[2]);
+        endSlice = std::max(endSlice, region.GetUpperIndex()[2]);
+      }
+    }
+
+    std::cout << "startSlice " << startSlice << std::endl;
+    std::cout << "endSlice " << endSlice << std::endl;
+    if (startSlice >= endSlice) {
+      std::cout << "error: image " << imageFile << " has invalid labels" << std::endl;
       continue;
     }
 
-    //expand region a little bit
+    //expand a little bit
     const int slicePadding = 2; //pad region by z axis
-    const int maxSlice = image8->GetLargestPossibleRegion().GetUpperIndex()[2];
-    int startSlice = region.GetIndex()[2] - slicePadding;
-    if (startSlice < 0) {
-      startSlice = 0;
-    }
-    int endSlice = region.GetUpperIndex()[2] + slicePadding;
-    if (endSlice > maxSlice) {
-      endSlice = maxSlice;
-    }
+    startSlice = std::max(startSlice - slicePadding, 0L);
+    endSlice = std::min(endSlice + slicePadding, maxSlice);
 
     for (size_t z = startSlice; z <= endSlice; z++) {
       auto sliceImage = exctractSlice(image8.GetPointer(), z);
-      auto sliceLabel = exctractSlice(label1.GetPointer(), z);
-
       sliceImage = resize(sliceImage.GetPointer(), outSize2D);
-      sliceLabel = resizeBinary(sliceLabel.GetPointer(), outSize2D);
 
-      itk::ImageRegionIterator<UInt8Image2D> it(sliceLabel, sliceLabel->GetLargestPossibleRegion());
-      for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
-        it.Set(it.Get() > 0 ? 1 : 0);
+      BinaryImage2D::Pointer sliceMultilabel = BinaryImage2D::New();
+      sliceMultilabel->CopyInformation(sliceImage);
+      sliceMultilabel->SetRegions(sliceImage->GetLargestPossibleRegion());
+      sliceMultilabel->Allocate(true);
+
+      for (int i = 0; i < labels.size(); ++i) { //todo reorder loops
+        auto label = labels[i];
+
+        auto sliceLabel = exctractSlice(label.GetPointer(), z);
+        sliceLabel = resizeBinary(sliceLabel.GetPointer(), outSize2D);
+
+        itk::ImageRegionIterator<BinaryImage2D> itLabel(sliceLabel, sliceLabel->GetLargestPossibleRegion());
+        itk::ImageRegionIterator<BinaryImage2D> itMultilabel(sliceMultilabel, sliceMultilabel->GetLargestPossibleRegion());
+        for (itLabel.GoToBegin(), itMultilabel.GoToBegin(); !itLabel.IsAtEnd(); ++itLabel, ++itMultilabel) {
+          if (itLabel.Get() > 0) {
+            itMultilabel.Set(i + 1);
+          }
+        }
       }
-
+      
       auto indexStr = "n" + std::to_string(iImage) + "_z" + std::to_string(z);
       auto dirImages = outputFolder + "/images/";
       auto dirLabels = outputFolder + "/labels/";
@@ -169,7 +200,7 @@ int main(int argc, char* argv[])
       std::string filenameLabel = dirLabels + indexStr + ext;
 
       writeImage(sliceImage.GetPointer(), filenameImage);
-      writeImage(sliceLabel.GetPointer(), filenameLabel);
+      writeImage(sliceMultilabel.GetPointer(), filenameLabel);
 
       std::cout << z << " slice of " << iImage << " image" << std::endl;
     }
