@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
     bool isValidRegion;
     auto region = getBinaryMaskBoundingBoxRegion(label1, &isValidRegion);
     if (!isValidRegion) {
-      break;
+      continue;
     }
 
     //expand region a little bit
