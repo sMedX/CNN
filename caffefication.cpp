@@ -11,7 +11,6 @@
 #include <caffe/blob.hpp>
 
 #include <agtkResampling.h>
-#include <agtkIO.h>
 
 #include "preprocess.h"
 #include "caffefication.h"
