@@ -1,0 +1,1 @@
+#define AGTK_EXPORT //it's ok

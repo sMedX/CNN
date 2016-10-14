@@ -44,17 +44,8 @@ if( WIN32 )
 endif()
 
 # ------------------------------------------------------------------------------
-# AGTK
+# AGTK TODO
 # ------------------------------------------------------------------------------
-find_package(AGTK)
-include(${AGTK_USE_FILE})
-
-list(APPEND LIBRARIES ${AGTK_LIBRARIES})
-#list(REMOVE_ITEM LIBRARIES "ITKVideoBridgeOpenCV")
-#list(REMOVE_ITEM LIBRARIES "ITKVtkGlue")
-message(STATUS "AGTK_LIBRARIES ${AGTK_LIBRARIES}")
-
-include_directories(${AGTK_INCLUDE_DIRS})
 
 # ------------------------------------------------------------------------------
 # Caffe
@@ -90,10 +81,6 @@ D:/apb/SB/MITK-superbuild/ep/lib/gdcmexpat.lib;\
 D:/apb/SB/MITK-superbuild/ep/lib/gdcmIOD.lib;\
 D:/apb/SB/MITK-superbuild/ep/lib/gdcmDICT.lib;\
 D:/apb/SB/MITK-superbuild/ep/lib/gdcmcharls.lib;")
-
-add_subdirectory(validation)
-add_subdirectory(postprocessing)
-add_subdirectory(utils)
 
 set(SOURCES "caffefication.cpp" "caffefication.h")
 include_directories("utils")

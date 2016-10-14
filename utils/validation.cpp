@@ -105,7 +105,7 @@ int main(int argc, char** argv)
   // todo decide who must make resampling to initial spacing validator or segmentator. prefer segmentator
   if (testImage->GetSpacing() != labelImage->GetSpacing()) {
     std::cout << "Resampling test image" << std::endl;
-    testImage = resamplingLike(testImage.GetPointer(), labelImage.GetPointer());
+    testImage = resample(testImage.GetPointer(), labelImage.GetPointer());
   }
   // Evaluate distance based metrics
   std::cout << std::endl;
