@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
     spacing3D[1] = spacing;
     spacing3D[2] = mask->GetSpacing()[2];
 
-    mask = resamplingBinary(mask.GetPointer(), spacing3D);
+    mask = resampleBinary(mask.GetPointer(), spacing3D);
     writeImage(mask, outputFile);
   }
   return EXIT_SUCCESS;

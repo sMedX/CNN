@@ -19,11 +19,14 @@ set(CMAKE_CXX_EXTENSIONS 0)
 set(CMAKE_CXX_STANDARD ${AGTK_CXX_STANDARD})
 set(CMAKE_CXX_STANDARD_REQUIRED 1)
 
+
+# ------------------------------------------------------------------------------
+# Depends
+# ------------------------------------------------------------------------------
 if( WIN32 )
  #disable default static linking
  add_definitions(-DBOOST_ALL_DYN_LINK) 
 endif()
-
 
 # Boost filesystem
 set(Boost_LIBRARY_DIR "" CACHE PATH "")
@@ -41,6 +44,9 @@ include_directories(${ITK_INCLUDE_DIRECTORIES})
 add_subdirectory(mini-AGTK)
 include_directories("mini-AGTK")
 
+# ------------------------------------------------------------------------------
+# Targets
+# ------------------------------------------------------------------------------
 #
 set(SOURCES "cutImageByTiles.cpp" "preprocess.h")
 add_executable(cutImageByTiles ${SOURCES})
@@ -50,3 +56,18 @@ TARGET_LINK_LIBRARIES(cutImageByTiles mini-AGTK ${LIBRARIES} )
 set(SOURCES "cutImageBySlices.cpp" "preprocess.h")
 add_executable(cutImageBySlices ${SOURCES})
 TARGET_LINK_LIBRARIES(cutImageBySlices mini-AGTK ${LIBRARIES})
+
+#
+set(SOURCES "validation.cpp")
+add_executable(validation ${SOURCES})
+TARGET_LINK_LIBRARIES(validation mini-AGTK ${LIBRARIES})
+
+#
+set(SOURCES "validationRetVOE.cpp")
+add_executable(validationRetVOE ${SOURCES})
+TARGET_LINK_LIBRARIES(validationRetVOE mini-AGTK ${LIBRARIES})
+
+#
+set(SOURCES "postprocessing.cpp")
+add_executable(postprocessing ${SOURCES})
+TARGET_LINK_LIBRARIES(postprocessing mini-AGTK ${LIBRARIES} )

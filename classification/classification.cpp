@@ -16,7 +16,7 @@
 
 #include "agtkTypes.h"
 
-#include "D:\alex\CNN\caffefication.h" //TODO
+#include "../caffefication.h"
 
 //#define RUNTIME_CAFFEFICATION
 

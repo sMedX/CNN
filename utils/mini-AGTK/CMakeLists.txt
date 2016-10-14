@@ -32,7 +32,16 @@ set(SOURCES "agtkCommandLineArgumentParser.cxx"
 "agtkResampling.h"
 "agtkBinaryImageUtilities.h"
 "agtkBinaryImageUtilities.cxx"
-"agtkImageFilteringShortcuts.h")
+"agtkImageFilteringShortcuts.h"
+"agtkDistanceBasedMetrics.hxx"
+"agtkConfusionMatrixBasedMetrics.h"
+"agtkConfusionMatrixBasedMetrics.hxx"
+"agtkDistanceBasedMetrics.h"
+"agtkImageSimilarityMetricsBase.hxx"
+"agtkImageSimilarityMetricsBase.h"
+"agtkMetricInfo.cxx"
+"agtkMetricInfo.h"
+"agtkExport.h")
 
 add_library(mini-AGTK ${SOURCES})
 
