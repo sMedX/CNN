@@ -1,9 +1,5 @@
-project(classification)
+project(classify)
 
-list(APPEND LIBRARIES ${LIBRARIES})
-
-set(SOURCES "classification.cpp")
-
-add_executable(classification ${SOURCES})
-
-TARGET_LINK_LIBRARIES(classification caffefication ${LIBRARIES} )
+set(SOURCES "classify3d.cpp")
+add_executable(classify3d ${SOURCES})
+TARGET_LINK_LIBRARIES(classify3d caffefication ${LIBRARIES} )

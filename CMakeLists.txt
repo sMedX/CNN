@@ -63,24 +63,26 @@ message(STATUS "Caffe_LINKER_LIBS ${Caffe_LINKER_LIBS}")
 
 add_subdirectory(classification)
 
-#list(APPEND LIBRARIES "D:/alex/caffe-ms/NugetPackages/hdf5-v120-complete.1.8.15.2/lib/native/lib/x64/hdf5_hl.lib") #todo
-list(APPEND LIBRARIES "C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl.lib;C:/Program Files/HDF_Group/HDF5/1.8.16/lib/hdf5_hl_cpp.lib;") #todo
+set(HDF51_8_16_LIB_DIR "C:/Program Files/HDF_Group/HDF5/1.8.16/lib" CACHE PATH) #todo
+#"D:/alex/caffe-ms/NugetPackages/hdf5-v120-complete.1.8.15.2/lib/native/lib/x64/hdf5_hl.lib")
+list(APPEND LIBRARIES "${HDF51_8_16_LIB_DIR}/hdf5_hl.lib;${HDF51_8_16_LIB_DIR}/hdf5_hl_cpp.lib;") 
 
 #TODO gdcm lib from itk
-list(APPEND LIBRARIES "D:/apb/SB/MITK-superbuild/ep/lib/gdcmMEXD.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmMSFF.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmgetopt.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmopenjpeg.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmjpeg8.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmjpeg16.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmjpeg12.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmCommon.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmzlib.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmDSED.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmexpat.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmIOD.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmDICT.lib;\
-D:/apb/SB/MITK-superbuild/ep/lib/gdcmcharls.lib;")
+set(GDCM_LIB_DIR "D:/apb/SB/MITK-superbuild/ep/lib" CACHE PATH)
+list(APPEND LIBRARIES "${GDCM_LIB_DIR}/gdcmMEXD.lib;\
+${GDCM_LIB_DIR}/gdcmMSFF.lib;\
+${GDCM_LIB_DIR}/gdcmgetopt.lib;\
+${GDCM_LIB_DIR}/gdcmopenjpeg.lib;\
+${GDCM_LIB_DIR}/gdcmjpeg8.lib;\
+${GDCM_LIB_DIR}/gdcmjpeg16.lib;\
+${GDCM_LIB_DIR}/gdcmjpeg12.lib;\
+${GDCM_LIB_DIR}/gdcmCommon.lib;\
+${GDCM_LIB_DIR}/gdcmzlib.lib;\
+${GDCM_LIB_DIR}/gdcmDSED.lib;\
+${GDCM_LIB_DIR}/gdcmexpat.lib;\
+${GDCM_LIB_DIR}/gdcmIOD.lib;\
+${GDCM_LIB_DIR}/gdcmDICT.lib;\
+${GDCM_LIB_DIR}/gdcmcharls.lib;")
 
 set(SOURCES "caffefication.cpp" "caffefication.h")
 include_directories("utils")
