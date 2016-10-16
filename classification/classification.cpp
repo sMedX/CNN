@@ -7,34 +7,17 @@
 
 // ITK
 #include <itkImage.h>
-#include <itkImageFileReader.h>
-#include <itkImageFileWriter.h>
 #include <itkMetaImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 
 #include "caffe/caffe.hpp"
 
 #include "agtkTypes.h"
+#include "agtkIO.h"
 
 #include "../caffefication.h"
 
 //#define RUNTIME_CAFFEFICATION
-
-bool writeImage(const std::string& outputFile, const agtk::BinaryImage3D::Pointer& outImage)
-{
-  typedef itk::ImageFileWriter<agtk::BinaryImage3D>  writerType;
-  writerType::Pointer writer = writerType::New();
-  writer->SetFileName(outputFile);
-  writer->SetInput(outImage);
-  try {
-    writer->Update();
-  } catch (itk::ExceptionObject &excp) {
-    std::cout << "Exception thrown while writing " << std::endl;
-    std::cout << excp << std::endl;
-    return false;
-  }
-  return true;
-}
 
 int main(int argc, char** argv)
 {
@@ -136,6 +119,7 @@ int main(int argc, char** argv)
 #define loadNet loadNetFunc
 #endif 
   std::shared_ptr<caffe::Net<float>> caffeNet;
+  
   //Setting CPU or GPU
   caffefication::loadNet(modelFile, trainedFile, deviceId, caffeNet);
   std::cout << "load images" << std::endl;
@@ -148,38 +132,23 @@ int main(int argc, char** argv)
   RegisteredObjectsContainerType registeredIOs = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
   std::cout << "there are " << registeredIOs.size() << " IO objects available to the ImageFileReader." << std::endl;
 
-  typedef itk::ImageFileReader<Int16Image3D> ReaderType;
-  typedef itk::ImageFileReader<BinaryImage3D> BinaryReaderType;
-
-  ReaderType::Pointer reader = ReaderType::New();
-  reader->SetFileName(inputFile);
-  try {
-    reader->Update();
-  } catch (itk::ExceptionObject &excp) {
-    std::cout << "Exception thrown while reading the image " << std::endl;
-    std::cout << excp << std::endl;
-    return false;
-  }
-  std::cout << "." << std::endl;
-
+  std::cout << __LINE__ << std::endl;  //dbg
   BinaryImage3D::Pointer imageMask;
   if (maskFile == "BOUNDING_BOX") {
     imageMask = nullptr;
   } else {
-    BinaryReaderType::Pointer readerMask = BinaryReaderType::New();
-    readerMask->SetFileName(maskFile);
-    try {
-      readerMask->Update();
-    } catch (itk::ExceptionObject &excp) {
-      std::cout << "Exception thrown while reading the mask " << std::endl;
-      std::cout << excp << std::endl;
+    imageMask = BinaryImage3D::New();
+    if (!readImage<BinaryImage3D>(imageMask, maskFile)) {
+      std::cout << "Exception thrown while reading the mask " << maskFile << std::endl;
       return false;
     }
-    imageMask = readerMask->GetOutput();
   }
-  std::cout << "." << std::endl;
 
-  Int16Image3D::Pointer image16 = reader->GetOutput();
+  Int16Image3D::Pointer image16 = Int16Image3D::New();
+  if (!readImage<Int16Image3D>(image16, inputFile)) {
+    std::cout << "Exception thrown while reading the image " << inputFile << std::endl;
+    return false;
+  }
 
   BinaryImage3D::Pointer outImage;
 
@@ -190,7 +159,7 @@ int main(int argc, char** argv)
   }
 
   std::cout << "save" << std::endl;
-  if (!writeImage(outputFile, outImage)) {
+  if (!writeImage(outImage, outputFile)) {
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
