@@ -59,23 +59,22 @@ def main():
     with open(samplesList) as f:
         for line in f:
             line = line.replace('\n','')
-            outputCNN='preset_'+netDir.split('/')[-1]+'_postproc.nrrd' 
-            subprocess.call([postproc, '-image', os.path.join(imagesDir, preset, line, outputCNN), '-gaussianVariance', sigma, '-preset', preset])
-
-    validate(sampleTrainList, sampleTestList, label, outputCNN, '')
+            subprocess.call([postproc, '--image', os.path.join(imagesDir, preset, line, outputCNN), '--gaussianVariance', sigma, '--preset', preset])
+    """
+    validate(sampleTrainList, sampleTestList, label, outputCNN+'-gaussian'+sigma+'.nrrd', preset, '')
 
 
 def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
     with open(samplesTrainListK) as f:
         for line in f:
             line = line.replace('\n','')
-            subprocess.call([valid, '-testImage', os.path.join(imagesDir, preset, line, outputCNN), '-label', os.path.join(imagesDir, preset, line, label),
-                             '-report', 'report-cnn-train-' + preset + '-' + suffix + '.csv'])
+            subprocess.call([valid, '--testImage', os.path.join(imagesDir, preset, line, outputCNN), '--label', os.path.join(imagesDir, preset, line, label),
+                             '--report', 'report-cnn-train-' + preset + '-' + suffix + '.csv'])
     with open(samplesTestListK) as f:
         for line in f:
             line = line.replace('\n','')
-            subprocess.call([valid, '-testImage', os.path.join(imagesDir, preset, line, outputCNN), '-label', os.path.join(imagesDir, preset, line, label),
-                             '-report', 'report-cnn-test-'  + preset + '-'+ suffix + '.csv'])
+            subprocess.call([valid, '-testImage', os.path.join(imagesDir, preset, line, outputCNN), '--label', os.path.join(imagesDir, preset, line, label),
+                             '--report', 'report-cnn-test-'  + preset + '-'+ suffix + '.csv'])
     
 if __name__ == "__main__":
     main()
