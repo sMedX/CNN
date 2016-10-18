@@ -51,44 +51,7 @@ inline UInt8Image3D::Pointer smartCastImage(const std::string& preset, Int16Imag
     for (it.GoToBegin(); !it.IsAtEnd(); ++it) {
       it.Set(it.Get() + shift);
     }
-    ////HARDCODE  normolizing image to mean 0 and std 1
-    //double mean = 0;
-    //int n = 0;
-    //itk::ImageRegionConstIterator<BinaryImage3D> itMask(mask, mask->GetLargestPossibleRegion());
-    //for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
-    //  auto index = itMask.GetIndex();
-    //  if (itMask.Get()) {
-    //    mean += image16->GetPixel(itMask.GetIndex());
-    //    ++n;
-    //  }
-    //}
-
-    //if (n == 0) {
-    //  auto error_empty_mask = "error: empty mask";
-    //  std::cout << error_empty_mask;
-    //  throw std::exception(error_empty_mask);
-    //}
-
-    //mean /= n;
-
-    //std::cout << "mean is " << mean << std::endl;
-
-    //double var = 0;
-    //for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
-    //  if (itMask.Get()) {
-    //    var += pow(mean - image16->GetPixel(itMask.GetIndex()), 2);
-    //  }
-    //}
-    //var /= (n - 1);
-
-    //for (itMask.GoToBegin(); !itMask.IsAtEnd(); ++itMask) {
-    //  if (itMask.Get()) {
-    //    auto index = itMask.GetIndex();
-    //    image16->SetPixel(index, (image16->GetPixel(index) - mean) / var*1000 + 127); //
-    //  }
-    //}
-
-  }
+  } 
   std::cout << "cast (truncate)" << std::endl;
   // force integer overflow
   UInt8Image3D::PixelType minValue = 0, maxValue = 255;

@@ -19,13 +19,13 @@ int main(int argc, char** argv)
   parser->SetCommandLineArguments(argc, argv);
 
   std::string imageFile;
-  parser->GetValue("-image", imageFile);
+  parser->GetValue("--image", imageFile);
 
   float gaussianVariance;
-  parser->GetValue("-gaussianVariance", gaussianVariance);
+  parser->GetValue("--gaussianVariance", gaussianVariance);
 
   std::string preset;
-  parser->GetValue("-preset", preset);
+  parser->GetValue("--preset", preset);
 
   std::cout << "image file  " << imageFile << std::endl;
 

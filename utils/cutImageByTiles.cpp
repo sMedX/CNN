@@ -122,43 +122,43 @@ int main(int argc, char* argv[])
   parser->SetCommandLineArguments(argc, argv);
 
   std::string imageName;
-  parser->GetValue("-imageName", imageName);
+  parser->GetValue("--imageName", imageName);
 
   std::string labelName1;
-  parser->GetValue("-labelName1", labelName1); //class under label '1'
+  parser->GetValue("--labelName1", labelName1); //class under label '1'
 
   std::string labelName2; //class under label '2' that is entirely in class '1', optional
-  parser->GetValue("-labelName2", labelName2);
+  parser->GetValue("--labelName2", labelName2);
 
   std::string maskName;
-  parser->GetValue("-maskName", maskName);
+  parser->GetValue("--maskName", maskName);
 
   std::string adaptiveName; //name of adaptive image i.e. result of previous classification
-  parser->GetValue("-adaptive", adaptiveName);
+  parser->GetValue("--adaptive", adaptiveName);
 
   std::string listFile;
-  parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
+  parser->GetValue("--listFile", listFile); // conains pathes without slashes on the end
 
   unsigned int radius;
-  parser->GetValue("-radius", radius);
+  parser->GetValue("--radius", radius);
 
   Image3DSize stride = { 1, 1, 1 }; //default no-stride
-  parser->GetITKValue<Image3DSize>("-stride", stride);
+  parser->GetITKValue<Image3DSize>("--stride", stride);
 
   std::string preset;
-  parser->GetValue("-preset", preset);
+  parser->GetValue("--preset", preset);
 
   float spacingXY;
-  parser->GetValue("-spacingXY", spacingXY);
+  parser->GetValue("--spacingXY", spacingXY);
 
   int strideNegative = 4; // additional stride for negative points
-  parser->GetValue("-strideNegative", strideNegative);
+  parser->GetValue("--strideNegative", strideNegative);
 
   bool isRgb = false;
-  parser->GetValue("-rgb", isRgb);
+  parser->GetValue("--rgb", isRgb);
 
   std::string outputFolder;
-  parser->GetValue("-folder", outputFolder);
+  parser->GetValue("--folder", outputFolder);
 
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "imageName  " << imageName << std::endl;
@@ -376,7 +376,7 @@ int main(int argc, char* argv[])
           writeImage(getRGBTile(imagePreproc, index, radius).GetPointer(), filename);
         } else {
           writeImage(getTile(imagePreproc, index, radius).GetPointer(), filename);
-        }
+
 
         if (j % 10000 == 0) {
           std::cout << static_cast<double>(j * 100) / totalCount << "% of " << iImageStr << " image" << std::endl;

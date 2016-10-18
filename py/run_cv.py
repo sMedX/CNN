@@ -60,9 +60,9 @@ n = 2  # number of parts for cross-validation
 
 def main():
     print 'cut ' + cut
-    retcode = subprocess.call([cut, '-listFile', samplesList, '-imageName', patient, '-labelName1', label,
-                     '-labelName2', 'livertumors_dark.nrrd', '-maskName', mask, '-radius', r, '-preset', preset,
-                     '-stride 3 3 3', '-spacingXY', spacing, spacing, '-strideNegative 4', '-folder', tilesFolder]) #.replace('/', '\\') for win
+    retcode = subprocess.call([cut, '--listFile', samplesList, '--imageName', patient, '--labelName1', label,
+                     '--labelName2', ' ', '--maskName', mask, '--radius', r, '--preset', preset,
+                     '--stride 3 3 3', '--spacingXY', spacing, spacing, '--strideNegative 4', '--folder', tilesFolder, '--rgb 1']) #.replace('/', '\\') for win
     
     if (retcode != 0):
         print 'error. ', cut, ' exit with ', retcode
@@ -119,7 +119,7 @@ def main():
         with open(samplesList) as f:
             for line in f:
                 line = line.replace('\n','')
-                subprocess.call([postproc, '-image', os.path.join(line, outputCNN), '-gaussianVariance', sigma, '-preset', preset])
+                subprocess.call([postproc, '--image', os.path.join(line, outputCNN), '--gaussianVariance', sigma, '-preset', preset])
         
         suffix = suffix + '-gaussian' + sigma + '.nrrd'
         outputCNN = preset + '-cnn' + suffix
@@ -128,9 +128,9 @@ def main():
         
         #adaptive cut
         #tilesFolderAdaptive = tilesFolder+'-ada-'+ver
-        #retcode = subprocess.call([cut, '-listFile', sampleTestListK, '-imageName', patient, '-labelName1', label,
-        #             '-labelName2', outputCNN, '-maskName', mask, '-radius', r, '-preset', preset,
-        #             '-stride 1 1 1', '-spacingXY', spacing, spacing, '-strideNegative 4', '-folder', tilesFolderAdaptive])#.replace('/', '\\') for win
+        #retcode = subprocess.call([cut, '--listFile', sampleTestListK, '--imageName', patient, '--labelName1', label,
+        #             '--labelName2', outputCNN, '--maskName', mask, '--radius', r, '--preset', preset,
+        #             '--stride 1 1 1', '--spacingXY', spacing, spacing, '--strideNegative 4', '--folder', tilesFolderAdaptive])#.replace('/', '\\') for win
 
         #if (retcode != 0):
         #    print 'error. ', cut, ' exit with ', retcode
@@ -268,13 +268,13 @@ def validate(samplesTrainListK, samplesTestListK, label, outputCNN, suffix):
     with open(samplesTrainListK) as f:
         for line in f:
             line = line.replace('\n','')
-            subprocess.call([valid, '-testImage', os.path.join(line, outputCNN), '-label', os.path.join(line, label),
-                             '-report', 'report-cnn-train-' + preset + '-' + suffix + '.csv'])
+            subprocess.call([valid, '--testImage', os.path.join(line, outputCNN), '--label', os.path.join(line, label),
+                             '--report', 'report-cnn-train-' + preset + '-' + suffix + '.csv'])
     with open(samplesTestListK) as f:
         for line in f:
             line = line.replace('\n','')
-            subprocess.call([valid, '-testImage', os.path.join(line, outputCNN), '-label', os.path.join(line, label),
-                             '-report', 'report-cnn-test-'  + preset + '-'+ suffix + '.csv'])
+            subprocess.call([valid, '--testImage', os.path.join(line, outputCNN), '--label', os.path.join(line, label),
+                             '--report', 'report-cnn-test-'  + preset + '-'+ suffix + '.csv'])
     return valid
 
 def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTestListK, iters, snapshotFolder):
