@@ -1,9 +1,5 @@
 #include <itkConstantPadImageFilter.h>
 
-#include <itkResampleImageFilter.h>
-#include <itkWindowedSincInterpolateImageFunction.h>
-#include <itkConstantBoundaryCondition.h>
-
 #include "agtkTypes.h"
 #include "agtkResampling.h"
 
@@ -74,21 +70,19 @@ inline UInt8Image3D::Pointer smartCastImage(const std::string& preset, Int16Imag
   return cast->GetOutput();
 }
 
-// Performs preprocessing befory cutting by tiles
-inline UInt8Image3D::Pointer preprocess(unsigned int radius, float spacingXY, bool isRgb, UInt8Image3D::Pointer input)
+// Performs preprocessing befory cutting by tiles.
+// 0 component in spacing means that each dimension stays same
+inline UInt8Image3D::Pointer preprocess(unsigned int radius, Image3DSpacing spacing, bool isRgb, UInt8Image3D::Pointer input)
 {
-  UInt8Image3D::Pointer resampled = nullptr;
-  //resample image by axial slices
-  if (spacingXY != 0 && !(input->GetSpacing()[0] == spacingXY && input->GetSpacing()[1] == spacingXY))
-  {
-    std::cout << "resample. " << input->GetSpacing()[0] << " -> " << spacingXY << std::endl;
-    Image3DSpacing spacing;
-    spacing[0] = spacingXY;
-    spacing[1] = spacingXY;
-    spacing[2] = input->GetSpacing()[2];
-
-    resampled = resample(input.GetPointer(), spacing);
+  auto oldSpacing = input->GetSpacing();
+  for (int i = 0; i < IMAGE_DIM_3; ++i) {
+    if (spacing[i] == 0) {
+      spacing[i] = oldSpacing[i];
+    }
   }
+  std::cout << "resample. " << input->GetSpacing()[0] << " -> " << spacing << std::endl;
+
+  UInt8Image3D::Pointer  resampled = resample(input.GetPointer(), spacing);
 
   const Image3DSize size3D = { radius, radius, isRgb ? 1u : 0u };
   std::cout << "padding by radius " << size3D << std::endl;
@@ -96,20 +90,17 @@ inline UInt8Image3D::Pointer preprocess(unsigned int radius, float spacingXY, bo
 }
 
 // Performs preprocessing befory cutting by tiles
-inline UInt8Image3D::Pointer preprocessBinary(unsigned int radius, float spacingXY, bool isRgb, UInt8Image3D::Pointer input)
+inline UInt8Image3D::Pointer preprocessBinary(unsigned int radius, Image3DSpacing  spacing, bool isRgb, UInt8Image3D::Pointer input)
 {
-  UInt8Image3D::Pointer resampled = nullptr;
-  //resample image by axial slices
-  if (spacingXY != 0 && !(input->GetSpacing()[0] == spacingXY && input->GetSpacing()[1] == spacingXY))
-  {
-    std::cout << "resample. " << input->GetSpacing()[0] << " -> " << spacingXY << std::endl;
-    Image3DSpacing spacing;
-    spacing[0] = spacingXY;
-    spacing[1] = spacingXY;
-    spacing[2] = input->GetSpacing()[2];
-
-    resampled = resampleBinary(input.GetPointer(), spacing);
+  auto oldSpacing = input->GetSpacing();
+  for (int i = 0; i < IMAGE_DIM_3; ++i) {
+    if (spacing[i] == 0) {
+      spacing[i] = oldSpacing[i];
+    }
   }
+  std::cout << "resample. " << input->GetSpacing()[0] << " -> " << spacing << std::endl;
+
+  UInt8Image3D::Pointer  resampled = resampleBinary(input.GetPointer(), spacing);
 
   const Image3DSize size3D = { radius, radius, isRgb ? 1u : 0u };
   std::cout << "padding by radius " << size3D << std::endl;

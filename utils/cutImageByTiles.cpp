@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
   parser->SetCommandLineArguments(argc, argv);
 
   std::string imageName;
-  parser->GetValue("--imageName", imageName);
+  parser->GetValue("--imageName", imageName); //relative names
 
   std::string labelName1;
   parser->GetValue("--labelName1", labelName1); //class under label '1'
@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
   parser->GetValue("--rgb", isRgb);
 
   std::string outputFolder;
-  parser->GetValue("--folder", outputFolder);
+  parser->GetValue("--outputFolder", outputFolder);
 
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "imageName  " << imageName << std::endl;
@@ -190,6 +190,9 @@ int main(int argc, char* argv[])
   }
   std::cout << "inputData.size() " << inputDirs.size() << std::endl;
 
+  fs::path imageDir(listFile);
+  imageDir.remove_filename();
+
   // set up output directories
   std::cout << outputFolder << std::endl;
   fs::create_directories(outputFolder);
@@ -199,7 +202,7 @@ int main(int argc, char* argv[])
 
 #pragma omp parallel for
   for (int iImage = 0; iImage < inputDirs.size(); ++iImage) {
-    auto inputDir = inputDirs[iImage];
+    auto inputDir = imageDir.generic_string() + inputDirs[iImage];
 
     bool isAdaptiveClasses = !adaptiveName.empty();
     bool isLabel2 = !labelName2.empty();
@@ -269,17 +272,24 @@ int main(int argc, char* argv[])
     // organ-based transformation to UINT8 from int16
     auto image = smartCastImage(preset, image16, mask);
 
-    //hardcoded consts
-    std::vector<float> spacingXYVector = {spacingXY};
-    for (float spacingXY : spacingXYVector) {
+    Image3DSpacing spacing3d;
+    spacing3d[0] = spacingXY;
+    spacing3d[1] = spacingXY;
+    spacing3d[2] = 0;
+
+
+    std::vector<Image3DSpacing> spacingVector = { spacing3d };
+    for (Image3DSpacing spacing : spacingVector) {
       std::cout << "preprocess images" << std::endl;
       std::cout << "spacing :" << spacingXY << std::endl;
 
-      UInt8Image3D::Pointer imagePreproc = preprocess(radius, spacingXY, isRgb, image),
-        label1Preproc = preprocessBinary(radius, spacingXY, isRgb, label1), // todo use binaryResampling
-        label2Preproc = label2 ? preprocessBinary(radius, spacingXY, isRgb, label2) : nullptr,
-        maskPreproc = mask ? preprocessBinary(radius, spacingXY, isRgb, mask) : nullptr,
-        adaptivePreproc = adaptive ? preprocessBinary(radius, spacingXY, isRgb, adaptive) : nullptr;
+
+
+      UInt8Image3D::Pointer imagePreproc = preprocess(radius, spacing, isRgb, image),
+        label1Preproc = preprocessBinary(radius, spacing, isRgb, label1), // todo use binaryResampling
+        label2Preproc = label2 ? preprocessBinary(radius, spacing, isRgb, label2) : nullptr,
+        maskPreproc = mask ? preprocessBinary(radius, spacing, isRgb, mask) : nullptr,
+        adaptivePreproc = adaptive ? preprocessBinary(radius, spacing, isRgb, adaptive) : nullptr;
 
       auto wholeRegion = imagePreproc->GetLargestPossibleRegion();
       std::cout << "new region: " << wholeRegion << std::endl;
@@ -376,7 +386,7 @@ int main(int argc, char* argv[])
           writeImage(getRGBTile(imagePreproc, index, radius).GetPointer(), filename);
         } else {
           writeImage(getTile(imagePreproc, index, radius).GetPointer(), filename);
-
+        }
 
         if (j % 10000 == 0) {
           std::cout << static_cast<double>(j * 100) / totalCount << "% of " << iImageStr << " image" << std::endl;
