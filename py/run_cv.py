@@ -28,7 +28,7 @@ preset = 'livertumors'
 ver = 'a'##
 spacing = '0.8'
 spacingStr = 'orig' if spacing=='0' else spacing
-tilesParam = ''##
+tilesParam = '_2.5d'##
 
 deviceId = '0'##
 iters = '15000'##
@@ -42,8 +42,8 @@ label = preset + '.nrrd'
 mask = 'liver.nrrd'
 patient = 'patient.nrrd'
 
-tilesFolder = os.path.join(tilesDir, preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr + tilesParam)
-samplesList = os.path.join(imagesDir, preset, 'samplesList.txt') ##
+tilesFolder = os.path.join(tilesDir, preset, str(size) + 'x' + str(size), 'sampling-' + spacingStr + tilesParam).replace('\\','/')
+samplesList = os.path.join(imagesDir, preset, 'samplesListRelative.txt').replace('\\','/') ##
 
 deploy = os.path.join(caffeNetsDir, preset, ver, 'deploy.prototxt')
 start = [0, 0, 0]
@@ -60,9 +60,12 @@ n = 2  # number of parts for cross-validation
 
 def main():
     print 'cut ' + cut
-    retcode = subprocess.call([cut, '--listFile', samplesList, '--imageName', patient, '--labelName1', label,
+    args = [python, cut, '--listFile', samplesList, '--imageName', patient, '--labelName1', label,
                      '--labelName2', ' ', '--maskName', mask, '--radius', r, '--preset', preset,
-                     '--stride 3 3 3', '--spacingXY', spacing, spacing, '--strideNegative 4', '--folder', tilesFolder, '--rgb 1']) #.replace('/', '\\') for win
+                     '--stride','5 5 5', '--spacingXY', spacing, '--strideNegative', '10',
+                     '--outputFolder', tilesFolder, '--rgb 0']
+
+    retcode = subprocess.call(args)
     
     if (retcode != 0):
         print 'error. ', cut, ' exit with ', retcode

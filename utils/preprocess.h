@@ -80,7 +80,7 @@ inline UInt8Image3D::Pointer preprocess(unsigned int radius, Image3DSpacing spac
       spacing[i] = oldSpacing[i];
     }
   }
-  std::cout << "resample. " << input->GetSpacing()[0] << " -> " << spacing << std::endl;
+  std::cout << "resample. " << input->GetSpacing() << " -> " << spacing << std::endl;
 
   UInt8Image3D::Pointer  resampled = resample(input.GetPointer(), spacing);
 
@@ -98,7 +98,7 @@ inline UInt8Image3D::Pointer preprocessBinary(unsigned int radius, Image3DSpacin
       spacing[i] = oldSpacing[i];
     }
   }
-  std::cout << "resample. " << input->GetSpacing()[0] << " -> " << spacing << std::endl;
+  std::cout << "resample. " << input->GetSpacing() << " -> " << spacing << std::endl;
 
   UInt8Image3D::Pointer  resampled = resampleBinary(input.GetPointer(), spacing);
 
