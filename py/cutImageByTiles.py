@@ -50,11 +50,6 @@ def cutImageByTiles2p5d(imageSitk, labelSitk, maskSitk, r, stride, strideNegativ
     label = np.pad(label, pad, mode='constant')
     mask = np.pad(mask, pad, mode='constant')
 
-    #todo dbg
-    sitk.WriteImage(sitk.GetImageFromArray(image), 'D:/alex/image.nrrd')
-    sitk.WriteImage(sitk.GetImageFromArray(label), 'D:/alex/label.nrrd')
-    sitk.WriteImage(sitk.GetImageFromArray(mask), 'D:/alex/mask.nrrd')
-
     print 'new shape ', image.shape
     indices = np.array(mask.nonzero())[:, ::stride]
     indices = list(indices.T)
@@ -85,10 +80,6 @@ def cutImageByTiles2p5d(imageSitk, labelSitk, maskSitk, r, stride, strideNegativ
         print index[1]-r, index[1]+r
         print index[2] - r, index[2]+r
         print tile1.shape
-
-        #scipy.misc.toimage(tile1, cmin=0, cmax=255).save('D:/alex/tile1.jpg')
-        #scipy.misc.toimage(tile2, cmin=0, cmax=255).save('D:/alex/tile2.jpg')
-        #scipy.misc.toimage(tile3, cmin=0, cmax=255).save('D:/alex/tile3.jpg')
 
         rgbArray = np.zeros((2*r,2*r,3), 'uint8')
         rgbArray[..., 0] = tile1

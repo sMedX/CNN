@@ -12,7 +12,7 @@ set "python=python.exe"
 set "nets=D:/alex/caffe-nets"
 set "images=D:/alex/images"
 set "tiles=D:/alex/tiles"
-set "snaps=D:/Artem/caffe/snap"
+set "snaps=D:/alex/caffe-nets/snaps"
 
 %python% run_cv.py
 pause
