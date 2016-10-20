@@ -11,11 +11,10 @@ from PIL import Image
 #creates 2.5d images as rgb images
 def cutImageByTiles2p5d(imageSitk, labelSitk, maskSitk, r, stride, strideNegative, n, tilesFolder,  comment = ''):
     #zyx ordered
-    image = sitk.GetArrayFromImage(imageSitk)
+    image = sitk.GetArrayFromImage(imageSitk) #todo explicit uint8 type
     label = sitk.GetArrayFromImage(labelSitk)
     mask = sitk.GetArrayFromImage(maskSitk)
 
-    r3d = np.array([r,r,r])
     sz = np.array(image.shape)
 
     indices = np.array(mask.nonzero())[::, ::stride]
@@ -25,11 +24,10 @@ def cutImageByTiles2p5d(imageSitk, labelSitk, maskSitk, r, stride, strideNegativ
     u = np.amax(indices, axis=1)
 
     #crop around bounding+r
-
-    cropL = l-r3d
+    cropL = l-r
     cropL[cropL<0]=0
 
-    cropU = u+r3d
+    cropU = u+r
     cropU[cropU >= sz] = sz[cropU >= sz] - 1
 
     image = image[cropL[0]:cropU[0], cropL[1]:cropU[1], cropL[2]:cropU[2]]
@@ -38,10 +36,11 @@ def cutImageByTiles2p5d(imageSitk, labelSitk, maskSitk, r, stride, strideNegativ
     print 'new shape ', image.shape
 
     #pad
-    padL = r3d-l
+    # wtf with +1?
+    padL = r-l+1
     padL[padL < 0] = 0
 
-    padU = u+r3d-sz
+    padU = u+r-sz+1
     padU[padU < 0] = 0
 
     pad = ((padL[0],padU[0]),(padL[1],padU[1]),(padL[2],padU[2]))
@@ -61,7 +60,6 @@ def cutImageByTiles2p5d(imageSitk, labelSitk, maskSitk, r, stride, strideNegativ
 
     print 'index count ', len(indices)
 
-    #
     for iLabel in [0,1]:
         try:
             os.makedirs(os.path.join(tilesFolder, n, str(iLabel)))
