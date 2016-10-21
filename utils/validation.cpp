@@ -79,13 +79,13 @@ int main(int argc, char** argv)
   parser->SetCommandLineArguments(argc, argv);
 
   std::string imageFile;
-  parser->GetValue("-testImage", imageFile);
+  parser->GetValue("--testImage", imageFile);
 
   std::string labelFile;
-  parser->GetValue("-label", labelFile);
+  parser->GetValue("--label", labelFile);
 
   std::string reportFile;
-  parser->GetValue("-report", reportFile);
+  parser->GetValue("--report", reportFile);
 
   std::cout << "test image file  " << imageFile << std::endl;
   std::cout << "label file " << labelFile << std::endl;

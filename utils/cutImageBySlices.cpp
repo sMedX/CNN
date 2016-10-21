@@ -58,25 +58,25 @@ int main(int argc, char* argv[])
   parser->SetCommandLineArguments(argc, argv);
 
   std::string imageName;
-  parser->GetValue("-imageName", imageName); // patient.nrrd for example
+  parser->GetValue("--imageName", imageName); // patient.nrrd for example
 
   std::vector<std::string> labelNames;
-  parser->GetValue("-labelNames", labelNames); //classes in forward order. 'liver.nrrd livertumors.nrrd' for example. the more last label is more important
+  parser->GetValue("--labelNames", labelNames); //classes in forward order. 'liver.nrrd livertumors.nrrd' for example. the more last label is more important
   
   std::string inputFolder;
-  parser->GetValue("-inFolder", inputFolder); // directory, that contains subdirectory listed in listFile
+  parser->GetValue("--inFolder", inputFolder); // directory, that contains subdirectory listed in listFile
 
   std::string listFile;
-  parser->GetValue("-listFile", listFile); // conains pathes without slashes on the end
+  parser->GetValue("--listFile", listFile); // conains pathes without slashes on the end
 
   std::string preset;
-  parser->GetValue("-preset", preset);
+  parser->GetValue("--preset", preset);
 
   std::string outputFolder;
-  parser->GetValue("-outFolder", outputFolder);
+  parser->GetValue("--outFolder", outputFolder);
 
   int outSize = 256;
-  parser->GetValue("-outSize", outSize);
+  parser->GetValue("--outSize", outSize);
 
   std::cout << "list file  " << listFile << std::endl;
   std::cout << "imageName  " << imageName << std::endl;

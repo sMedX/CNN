@@ -141,12 +141,16 @@ namespace caffefication {
   std::cout << "isRgb: " << isRgb << std::endl;
   std::cout << "channels: " << channels << std::endl;
 
+  Image3DSpacing spacing;
+  spacing[0] = spacingXY;
+  spacing[1] = spacingXY;
+  spacing[2] = 0;
   UInt8Image3D::Pointer image8;
   {
     UInt8Image3D::Pointer imgage8Tmp = smartCastImage(preset, image16, imageMask);
-    image8 = preprocess(radius, spacingXY, isRgb, imgage8Tmp);
+    image8 = preprocess(radius, spacing, isRgb, imgage8Tmp);
   }
-  imageMask = preprocessBinary(radius, spacingXY, isRgb, imageMask);
+  imageMask = preprocessBinary(radius, spacing, isRgb, imageMask);
 
   std::cout << "cast image to float" << std::endl;
   typedef itk::CastImageFilter<UInt8Image3D, FloatImage3D> Cast;
