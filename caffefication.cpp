@@ -323,8 +323,12 @@ namespace caffefication {
 
 void loadNet(const std::string& modelFile, const std::string& trainedFile, int deviceId, OUT std::shared_ptr<caffe::Net<float>>& caffeNet)
 {
-  caffe::Caffe::set_mode(caffe::Caffe::GPU);
-  caffe::Caffe::SetDevice(deviceId);
+  if (deviceId == -1) {
+    caffe::Caffe::set_mode(caffe::Caffe::CPU);
+  } else {
+    caffe::Caffe::set_mode(caffe::Caffe::GPU);
+    caffe::Caffe::SetDevice(deviceId);       
+  }
 
   std::cout << "create net" << std::endl;
   caffeNet = std::make_shared<caffe::Net<float>>(modelFile, caffe::TEST);

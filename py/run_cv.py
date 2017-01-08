@@ -5,8 +5,6 @@ import errno
 import itertools
 import sys
 import random
-import numpy as np # for creation infogainHMatrix
-import caffe # for creation infogainHMatrix
 import time
 
 # environ
@@ -64,6 +62,7 @@ def main():
                      '--labelName2', ' ', '--maskName', mask, '--radius', r, '--preset', preset,
                      '--stride','5 5 5', '--spacingXY', spacing, '--strideNegative', '10',
                      '--outputFolder', tilesFolder, '--rgb 0']
+    print ' '.join(args)
 
     retcode = subprocess.call(args)
     
@@ -76,10 +75,9 @@ def main():
         os.makedirs(tilesFolder)
     makeSampleNames(int(classCount), tilesFolder, dir, imagesDir, samplesList, n)
 
-    return#debug
     #matrix with penalties for infogain loss layer
     #createHMatrix()
-    
+
     for k in range(0, n):
         kn = str(k) + '-' + str(n)
         # create folder for snapshots
@@ -325,6 +323,9 @@ def createNetAndSolver(kn, tileTrainTestListK, tileTrainListK, tileTestTestListK
     return solver
 
 def createHMatrix(): # todo make valuable parameters
+    import numpy as np
+    import caffe
+
     L=int(classCount)
     H = np.eye( L, dtype = 'f4' ) 
 
