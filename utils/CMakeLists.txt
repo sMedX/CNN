@@ -71,3 +71,8 @@ TARGET_LINK_LIBRARIES(validationRetVOE mini-AGTK ${LIBRARIES})
 set(SOURCES "postprocessing.cpp")
 add_executable(postprocessing ${SOURCES})
 TARGET_LINK_LIBRARIES(postprocessing mini-AGTK ${LIBRARIES} )
+
+#
+set(SOURCES "runPreprocess.cpp")
+add_executable(runPreprocess ${SOURCES})
+TARGET_LINK_LIBRARIES(runPreprocess mini-AGTK ${LIBRARIES} )

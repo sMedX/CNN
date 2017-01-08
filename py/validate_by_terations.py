@@ -58,14 +58,14 @@ for iter in range(45000,5000,-5000):
             postprocessedImage1 = outputImage+'-largestObject.nrrd'
             postprocessedImage2 = outputImage+'-gaussian'+sigma+'.nrrd'
             if forceOverwrite or not os.path.isfile(postprocessedImage1) or not os.path.isfile(postprocessedImage2):
-                args = [postproc, '-image', os.path.join(line, outputImage), '-gaussianVariance', sigma, '-preset', preset]
+                args = [postproc, '--image', os.path.join(line, outputImage), '--gaussianVariance', sigma, '--preset', preset]
                 print args
                 call(args)  
             
             voe=[0,0,0]
-            voe[0]=call([exeValid,  '-testImage', outputImage, '-label', os.path.join(path,preset+'.nrrd')])
-            voe[1]=call([exeValid,  '-testImage', postprocessedImage1, '-label', os.path.join(path,preset+'.nrrd')])
-            voe[2]=call([exeValid,  '-testImage', postprocessedImage2, '-label', os.path.join(path,preset+'.nrrd')])
+            voe[0]=call([exeValid,  '--testImage', outputImage, '--label', os.path.join(path,preset+'.nrrd')])
+            voe[1]=call([exeValid,  '--testImage', postprocessedImage1, '--label', os.path.join(path,preset+'.nrrd')])
+            voe[2]=call([exeValid,  '--testImage', postprocessedImage2, '--label', os.path.join(path,preset+'.nrrd')])
           
             print 'voe: ', voe
             for i in range(0, 3):
