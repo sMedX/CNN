@@ -194,7 +194,7 @@ class Data3DCutter(caffe.Layer):
     def backward(self, top, propagate_down, bottom):
         pass
 
-
+# trusted
 class EuclideanLossLayer(caffe.Layer):
     """
     Compute the Euclidean Loss in the same manner as the C++ EuclideanLossLayer
@@ -231,6 +231,7 @@ class EuclideanLossLayer(caffe.Layer):
             bottom[i].diff[...] = sign * self.diff / bottom[i].num
 
 
+# not carefully tested
 class CrossEntropyLossLayer(caffe.Layer):
 
     def setup(self, bottom, top):
@@ -294,6 +295,7 @@ class CrossEntropyLossLayer(caffe.Layer):
             #self.diff[...] = bottom[0].data - bottom[1].data
 
 
+# not carefully tested
 class LabelVecLayer(caffe.Layer):
 
     def setup(self, bottom, top):
@@ -314,6 +316,7 @@ class LabelVecLayer(caffe.Layer):
         pass
 
 
+# not carefully tested
 class LabelVecSpatialLayer(caffe.Layer):
 
     def setup(self, bottom, top):
@@ -335,7 +338,7 @@ class LabelVecSpatialLayer(caffe.Layer):
     def backward(self, top, propagate_down, bottom):
         pass
 
-
+# not carefully tested
 class ClassBalancerLayer(caffe.Layer):
 
     def setup(self, bottom, top):
@@ -358,6 +361,7 @@ class ClassBalancerLayer(caffe.Layer):
             print "\n"
 
 
+# not carefully tested
 class CenterPixelLayer(caffe.Layer):
 
     def setup(self, bottom, top):
@@ -373,89 +377,8 @@ class CenterPixelLayer(caffe.Layer):
         pass
 
 
-
-class ValTestAccuracyLayer(caffe.Layer):
-    """
-    Rewrite Accuracy layer as a Python layer
-    Use like this:
-    layer {
-        name: "accuracy"
-        type: "Python"
-        bottom: "pred"
-        bottom: "label"
-        top: "val-Accuracy"
-        top: "val-TPR"
-        top: "val-TNR"
-        top: "val-VOE"
-        top: "test-Accuracy"
-        top: "test-TPR"
-        top: "test-TNR"
-        top: "test-VOE"
-        include {
-            phase: TEST
-        }
-        python_param {
-            module: ""
-            layer: "AccuracyLayer"
-        }
-    }
-    """
-
-    def setup(self, bottom, top):
-        assert len(bottom) == 2,    'requires two layer.bottoms'
-        assert len(top) == 4,       'requires 3 layer.top'
-
-
-    def reshape(self, bottom, top):
-        #val
-        top[0].reshape(1)
-        top[1].reshape(1)
-        top[2].reshape(1)
-        top[3].reshape(1)
-        #test
-        top[4].reshape(1)
-        top[5].reshape(1)
-        top[6].reshape(1)
-        top[7].reshape(1)
-
-
-    def forward(self, bottom, top):
-        # Renaming for clarity
-        predictions = bottom[0].data
-        #print 'predictions', predictions
-        predictions = np.argmax(predictions, axis=1)  # make it labels instead of vectors of prob
-        ground_truth = bottom[1].data
-        #print 'ground_truth', ground_truth
-
-        for k in [0, 1]:  # val, test
-            tp, tn, fp, fn = 0.0, 0.0, 0.0, 0.0
-            half_count = predictions.shape[0]/2
-            for i in range(half_count):  # in batch
-                j = k*half_count + i
-                p = ground_truth[j] == 1
-                t = predictions[j] == ground_truth[j]
-                if t:
-                    if p:
-                        tp += 1
-                    else:  # n
-                        tn += 1
-                else:  # f
-                    if p:
-                        fp += 1
-                    else:  # n
-                        fn += 1
-
-            print tp, tn, fp, fn
-
-            top[4*k + 0].data[0] = 100*(tp + tn) / len(ground_truth)  # acc
-            top[4*k + 1].data[0] = 0 if tp == 0 else 100*tp/(tp+fn)  # tpr
-            top[4*k + 2].data[0] = 0 if tn == 0 else 100*tn/(fp+tn)  # tnr
-            top[4*k + 3].data[0] = 100*(1 - tp/(tp + fp + fn))  # voe
-
-    def backward(self, top, propagate_down, bottom):
-        pass
-
-
+# not carefully tested
+# need to rewrite in one accuracy layer
 class AccuracySpatialLayer(caffe.Layer):
     """
     Rewrite Accuracy layer as a Python layer
@@ -516,17 +439,17 @@ class AccuracySpatialLayer(caffe.Layer):
                         else:  # n
                             fn += 1
 
-            print tp, tn, fp, fn
+            #print tp, tn, fp, fn
 
-            top[0].data[0] = 100*(tp + tn) / (tp + tn + fp + fn)  # acc
+            top[0].data[0] = (tp + tn) / (tp + tn + fp + fn)  # acc
             top[1].data[0] = 0 if tp == 0 else 100*tp/(tp+fn)  # tpr
             top[2].data[0] = 0 if tn == 0 else 100*tn/(fp+tn)  # tnr
-            top[3].data[0] = 0 if tp == 0 else 100*(1 - tp/(tp + fp + fn))  # voe
+            top[3].data[0] = 100 if tp == 0 else 100*(1 - tp/(tp + fp + fn))  # voe
 
     def backward(self, top, propagate_down, bottom):
         pass
 
-
+# tested
 class AccuracyLayer(caffe.Layer):
     """
     Rewrite Accuracy layer as a Python layer
@@ -552,7 +475,7 @@ class AccuracyLayer(caffe.Layer):
 
     def setup(self, bottom, top):
         assert len(bottom) == 2,    'requires two layer.bottoms'
-        assert len(top) == 4,       'requires 3 layer.top'
+        assert len(top) == 4,       'requires 4 layer.top'
 
 
     def reshape(self, bottom, top):
@@ -566,7 +489,15 @@ class AccuracyLayer(caffe.Layer):
         # Renaming for clarity
         predictions = bottom[0].data
         #print 'predictions', predictions
-        predictions = np.argmax(predictions, axis=1)  # make it labels instead of vectors of prob
+        try:
+            predictions = np.argmax(predictions, axis=1)  # make it labels instead of vectors of prob
+        except ValueError:
+            print 'predictions.shape\n'
+            print predictions.shape
+            print 'predictions\n'
+            print predictions
+
+
         ground_truth = bottom[1].data
         #print 'ground_truth', ground_truth
 
@@ -583,21 +514,24 @@ class AccuracyLayer(caffe.Layer):
                 if p:
                     fp += 1
                 else:  # n
-                        fn += 1
+                    fn += 1
 
-            print tp, tn, fp, fn
+            #print tp, tn, fp, fn
 
-            k = 0.00245 # pos/neg ratio in source
+            k = 1 #0.00245 # pos/neg ratio in source
 
-            top[0].data[0] = 100*(tp + tn) / (tp + tn + fp +fn)  # acc balanced
+            top[0].data[0] = (tp + tn) / (tp + tn + fp +fn)  # acc balanced in range [0;1]
             top[1].data[0] = 0 if tp == 0 else 100*tp/(tp+fn)  # tpr
             top[2].data[0] = 0 if tn == 0 else 100*tn/(fp+tn)  # tnr
-            top[3].data[0] = 0 if tp == 0 else 100*(1 - k*tp/(k*(tp + fn) + fp))  # voe source
+            top[3].data[0] = 100 if tp == 0 else 100*(1 - k*tp/(k*(tp + fn) + fp))  # voe source
 
     def backward(self, top, propagate_down, bottom):
         pass
 
 
+# tested but why it now needed?
+# initially it was for coupling val and test data in one blob and then use decoupling layer accuracy
+# todo? remove
 class CoupledDataLayer(caffe.Layer):
 
     def setup(self, bottom, top):
@@ -635,6 +569,7 @@ class CoupledDataLayer(caffe.Layer):
         pass
 
 
+#used for initial training of FCN for only one pixel
 class CentralPixelLayer(caffe.Layer):
 
     def setup(self, bottom, top):
