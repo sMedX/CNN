@@ -12,49 +12,55 @@ from baseline_model import BaselineModel
 gflags.DEFINE_boolean("notebook", False, "")
 
 FLAGS = gflags.FLAGS
-FLAGS(sys.argv)
 
+class Trainer:
+  def __init__(self):
+    self.S = BaselineModel.Settings()
+    self.S.image_channels = 3
+    self.S.batch_size = 10
+    self.S.learning_rate = 1e-6
+    self.S.learning_rate = 0.001
+    self.S.num_conv_layers = 6
+    self.S.num_dense_layers = 3
+    self.S.image_width = 64 if FLAGS.notebook else 256
+    self.S.image_height = 64 if FLAGS.notebook else 256
 
-S = BaselineModel.Settings()
-S.image_channels = 3
-S.batch_size = 10
-S.learning_rate = 1e-6
-S.learning_rate = 0.001
-S.num_conv_layers = 6
-S.num_dense_layers = 3
+    self.ds = SegmentationDataSet()
+    self.pp = TrainingSetPreproc(self.ds, self.S.image_width, self.S.image_height, self.S.image_channels)
 
-if not FLAGS.notebook:
-  S.image_width = 256
-  S.image_height = 256
-else:
-  S.image_width = 64
-  S.image_height = 64
+    self.model = BaselineModel(self.S)
 
-ds = SegmentationDataSet()
-pp = TrainingSetPreproc(ds, S.image_width, S.image_height, S.image_channels)
+  def postprocess_batch(self, X, y):
+    X = X.astype(np.float32) / 255.
+    y = (y != 0).astype(np.uint8)
+    return (X, y)
 
-model = BaselineModel(S)
+  def training_step(self, step):
+    batch_images = np.random.randint(0, self.ds.get_training_set_size() - 1, self.S.batch_size)
+    (X, y) = self.pp.make_training_batch(batch_images)
+    (X, y) = self.postprocess_batch(X, y)
 
-#num_steps = 50000
-num_steps = 1000
-start_time = datetime.now()
+    (loss, accuracy) = self.model.fit(X, y)
+    print("step %d: loss = %f, accuracy = %f" % (step, loss, accuracy))
 
-for step in range(num_steps):
-  batch_images = np.random.randint(0, ds.get_training_set_size() - 1, S.batch_size)
-  (X, y) = pp.make_training_batch(batch_images)
-  X = X.astype(np.float32) / 255.
-  y = (y != 0).astype(np.uint8)
+  def validate(self, step):
+    N = self.ds.get_validation_set_size()
+    M = self.S.batch_size
 
-  (loss, accuracy) = model.fit(X, y)
+    (X_val, y_val) = self.pp.make_validation_batch(np.arange(0, N))
+    (X_val, y_val) = self.postprocess_batch(X_val, y_val)
 
-  print("step %d: loss = %f, accuracy = %f" % (step, loss, accuracy))
+    predict = np.zeros_like(y_val)
 
-  if step % 10 == 0:
-    (X_val, y_val) = pp.make_validation_batch(np.random.randint(0, ds.get_validation_set_size() - 1, S.batch_size))
-    X_val = X_val.astype(np.float32) / 255.
-    y_val = (y_val != 0).astype(np.uint8)
+    for i in range(0, N // M + 1):
+      l = i * M
+      h = min((i + 1) * M, N)
 
-    predict = model.predict(X_val)
+      X = np.zeros((M, self.S.image_width, self.S.image_height, self.S.image_channels))
+      X[0:h-l, :, :, :] = X_val[l:h, :, :, :]
+
+      predict[l:h, :, :] = self.model.predict(X)[0:h-l, :, :]
+
     val_accuracy = np.mean(predict == y_val)
 
     tp = np.sum(np.logical_and(predict == 1, y_val == 1).astype(np.float32))
@@ -65,16 +71,34 @@ for step in range(num_steps):
     P = tp / (tp + fp)
     R = tp / (tp + fn)
 
-    F2 = 2. * P * R / (P + R)
+    F1 = 2. * P * R / (P + R)
 
-    eta = num_steps * float((datetime.now() - start_time).total_seconds()) / (step + 1) / 60 / 60
-
-    print("val_accuracy = %f, P = %f, R = %f, F2 = %f, eta = %.2f hours" % (val_accuracy, P, R, F2, eta))
+    print("val_accuracy = %f, P = %f, R = %f, F1 = %f" % (val_accuracy, P, R, F1))
     print("tp = %d, fp = %d, tn = %d, fn = %d" % (tp, fp, tn, fn))
 
-    image_to_save = random.randint(0, S.batch_size - 1)
+    image_to_save = (step // 10) % self.ds.get_validation_set_size()
     misc.imsave("debug/validation_%05d_image.png" % step, X_val[image_to_save, :, :])
     misc.imsave("debug/validation_%05d_mask.png" % step, y_val[image_to_save, :, :] * 200)
     misc.imsave("debug/validation_%05d_predict.png" % step, predict[image_to_save, :, :] * 200)
 
-  sys.stdout.flush()
+  def train(self, num_steps):
+    start_time = datetime.now()
+
+    for step in range(num_steps):
+      self.training_step(step)
+
+      if step % 10 == 0:
+        self.validate(step)
+
+        if step > 0:
+          time_passed = float((datetime.now() - start_time).total_seconds())
+          eta = num_steps * time_passed / step / 60 / 60
+
+          print("eta = %.2f hours" % eta)
+
+      sys.stdout.flush()
+
+if __name__ == '__main__':
+  FLAGS(sys.argv)
+  Trainer().train(1000)
+

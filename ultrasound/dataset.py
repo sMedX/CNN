@@ -12,10 +12,10 @@ from scipy import misc
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_string('segmentation_dataset_dir', '/home/mel/datasets/usi_segmentation/images_seg/', '')
+gflags.DEFINE_string('segmentation_dataset_dir', '/home/mel/datasets/ultrasound_mw/', '')
 gflags.DEFINE_string('segmentation_dataset_image_glob', 'features/*.png', '')
 gflags.DEFINE_string('segmentation_dataset_mask_glob', 'mask/*.png', '')
-gflags.DEFINE_string('segmentation_dataset_validation_set_regex', 'aug3120151952.*', '')
+gflags.DEFINE_string('segmentation_dataset_validation_set_regex', '.*[2-3]_.*.png', '')
 
 class DataSet:
   def get_training_set_size(self):
@@ -108,7 +108,7 @@ class TrainingSetPreproc:
     self.image_height = image_height
     self.image_channels = image_channels
 
-  def preprocess_pair(self, image, mask):
+  def preprocess_pair(self, image, mask, norandom = False):
     (w1, h1, c1) = image.shape
     (w2, h2) = mask.shape
     assert w1 == w2 and h1 == h2, "Mismatching shapes: %dx%d vs. %dx%d." % (w1, h1, w2, h2)
@@ -122,14 +122,19 @@ class TrainingSetPreproc:
       (w1, h1, c1) = image.shape
 
     # crop
-    i = random.randint(0, w1 - self.image_width)
-    j = random.randint(0, h1 - self.image_height)
+    if norandom:
+      i = (w1 - self.image_width) // 2
+      j = (h1 - self.image_height) // 2
+    else:
+      i = random.randint(0, w1 - self.image_width)
+      j = random.randint(0, h1 - self.image_height)
+
     image = image[i : i + self.image_width, j : j + self.image_height]
     mask = mask[i : i + self.image_width, j : j + self.image_height]
 
     return (image, mask)
 
-  def make_batch_with_getter(self, image_nums, getter):
+  def make_batch_with_getter(self, image_nums, getter, norandom = False):
     batch_size = image_nums.shape[0]
 
     X = np.zeros((batch_size, self.image_width, self.image_height, self.image_channels))
@@ -137,7 +142,7 @@ class TrainingSetPreproc:
 
     for i, num in enumerate(image_nums):
       (image, mask) = getter(num)
-      (X[i, :, :, :], y[i, :, :]) = self.preprocess_pair(image, mask)
+      (X[i, :, :, :], y[i, :, :]) = self.preprocess_pair(image, mask, norandom = norandom)
 
     return (X, y)
 
@@ -145,7 +150,7 @@ class TrainingSetPreproc:
     return self.make_batch_with_getter(image_nums, self.dataset.get_training_pair)
 
   def make_validation_batch(self, image_nums):
-    return self.make_batch_with_getter(image_nums, self.dataset.get_validation_pair)
+    return self.make_batch_with_getter(image_nums, self.dataset.get_validation_pair, norandom = True)
 
 class TestTrainingSetPreparoc(unittest.TestCase):
   def test_basic(self):
