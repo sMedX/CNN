@@ -12,10 +12,10 @@ from scipy import misc
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_string('segmentation_dataset_dir', '/home/mel/datasets/ultrasound_mw/', '')
-gflags.DEFINE_string('segmentation_dataset_image_glob', 'features/*.png', '')
-gflags.DEFINE_string('segmentation_dataset_mask_glob', 'mask/*.png', '')
-gflags.DEFINE_string('segmentation_dataset_validation_set_regex', '.*[2-3]_.*.png', '')
+gflags.DEFINE_string("segmentation_dataset_dir", "/home/mel/datasets/ultrasound_mw/", "")
+gflags.DEFINE_string("segmentation_dataset_image_glob", "features/*.png", "")
+gflags.DEFINE_string("segmentation_dataset_mask_glob", "mask/*.png", "")
+gflags.DEFINE_string("segmentation_dataset_validation_set_regex", ".*[2-3]_.*.png", "")
 
 class DataSet:
   def get_training_set_size(self):
@@ -118,7 +118,7 @@ class TrainingSetPreproc:
     if k != 1:
       size = (max(int(w1 * k), self.image_width), max(int(h1 * k), self.image_height))
       image = misc.imresize(image, size)
-      mask = misc.imresize(mask, size, 'nearest')
+      mask = misc.imresize(mask, size, "nearest")
       (w1, h1, c1) = image.shape
 
     # crop
@@ -161,6 +161,6 @@ class TestTrainingSetPreparoc(unittest.TestCase):
     (_, w2, h2) = mask.shape
     assert np.max(np.unique(mask) - np.array([0, 255])) == 0, np.unique(mask)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   FLAGS(sys.argv)
   unittest.main()

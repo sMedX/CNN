@@ -45,7 +45,7 @@ class AutoEncoder:
         Z = self.X
         for layer in range(self.S.num_conv_layers):
             Z = self.add_conv_layer("ConvLayer%d" % layer, Z,
-                                    num_filters = self.S.num_conv_filters * (layer + 1))
+                                    num_filters=self.S.num_conv_filters * (layer + 1))
             print(Z)
 
         for layer in reversed(range(self.S.num_conv_layers)):
@@ -56,8 +56,11 @@ class AutoEncoder:
                 num_filters = self.S.image_channels
                 activation = None
 
-            Z = self.add_deconv_layer("DeconvLayer%d" % layer, Z, num_filters, activation)
+            Z = self.add_deconv_layer(
+                "DeconvLayer%d" % layer, Z, num_filters, activation)
             print(Z)
+
+        self.decoded_image = Z
 
         WH = self.S.image_width * self.S.image_height
 
@@ -85,7 +88,7 @@ class AutoEncoder:
             activation=tf.nn.relu)
         return outputs
 
-    def add_deconv_layer(self, name, inputs, num_filters, activation = None):
+    def add_deconv_layer(self, name, inputs, num_filters, activation=None):
         outputs = tf.layers.conv2d_transpose(
             name=name,
             inputs=inputs,
@@ -95,7 +98,7 @@ class AutoEncoder:
             bias_initializer=tf.zeros_initializer(),
             padding="SAME",
             strides=[2, 2],
-            activation = activation)
+            activation=activation)
         return outputs
 
     def fit(self, X):
@@ -106,9 +109,8 @@ class AutoEncoder:
         return (loss)
 
     def predict(self, X):
-        prediction = self.prediction.eval(
+        return self.decoded_image.eval(
             session=self.session, feed_dict={self.X: X})
-        return prediction
 
 
 class TestAutoEncoder(unittest.TestCase):
