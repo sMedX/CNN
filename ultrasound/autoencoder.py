@@ -8,7 +8,6 @@ from scipy import misc
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_string("checkpoints_dir", "./checkpoints", "")
 gflags.DEFINE_string("summaries_dir", "./summaries/", "")
 
 
@@ -138,6 +137,7 @@ class AutoEncoder:
     def clear(self):
         tf.reset_default_graph()
         self.session.close()
+
 
 class TestAutoEncoder(unittest.TestCase):
 
