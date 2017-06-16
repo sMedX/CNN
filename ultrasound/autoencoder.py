@@ -126,6 +126,10 @@ class AutoEncoder:
         return self.decoded_image.eval(
             session=self.session, feed_dict={self.X: X})
 
+    def encode(self, X):
+        return self.encoded_image.eval(
+            session=self.session, feed_dict={self.X: X})
+
     def read_model(self, filename):
         self.saver.restore(self.session, filename)
         print("Model restored from file: %s" % filename)

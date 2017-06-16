@@ -24,12 +24,15 @@ class DataSet:
         self.images = glob(os.path.join(FLAGS.dataset_dir, "*.jpeg"))
         print("Found %d images." % (len(self.images)))
 
-    def get_random_image(self):
-        image = random.choice(self.images)
+    def read_image(self, image):
         image = misc.imread(image)
         image = misc.imresize(image, (FLAGS.image_width, FLAGS.image_height))
         image = np.mean(image, axis=2, keepdims=True)
         return image
+
+    def get_random_image(self):
+        image = random.choice(self.images)
+        return self.read_image(image)
 
     def get_random_batch(self, size=None):
         if not size:
