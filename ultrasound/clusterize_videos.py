@@ -34,9 +34,11 @@ distance_matrix = np.zeros((len(key_indices), len(key_indices)))
 for i, x in enumerate(X):
     print(i)
 
-    distances, indices = tree.query(x, k = 10, p = 2, distance_upper_bound = 1.0e+4)
+    distances, indices = tree.query(x, k = 100, p = 2, distance_upper_bound = 1.0e+5)
+    print(indices)
 
     index0 = key_indices[keys[i]]
+    print(index0)
 
     for d, j in zip(distances, indices):
         if not np.isinf(d):
@@ -44,7 +46,6 @@ for i, x in enumerate(X):
 
             distance_matrix[index0, index1] += 1
             distance_matrix[index1, index0] += 1
-
-distance_matrix /= float(X.shape[0])
+            print("\t", index1)
 
 pickle.dump([sorted_keys, distance_matrix], open("clusterized.pickle", "wb"))
