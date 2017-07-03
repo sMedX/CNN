@@ -18,34 +18,27 @@ keys = list(vectors.keys())
 X = np.array(list(vectors.values()))
 print("%d keys, %s vectors loaded" % (len(keys), str(X.shape)))
 
-#keys = keys[0:1000]
-#X = X[0:1000]
-
-keys = [filename_to_video(k) for k in keys]
-sorted_keys = sorted(set(keys))
+key_filenames = [filename_to_video(k) for k in keys]
+sorted_keys = sorted(set(key_filenames))
 key_indices = {v: k for k, v in enumerate(list(sorted_keys))}
 print("%d videos" % len(key_indices))
 
-tree = scipy.spatial.KDTree(X)
-print("tree has been built")
+indexed_keys = np.array([key_indices[k] for k in key_filenames])
+
+print("building trees")
+trees = [scipy.spatial.KDTree(X[indexed_keys == k]) for k in range(len(key_indices))]
 
 distance_matrix = np.zeros((len(key_indices), len(key_indices)))
 
 for i, x in enumerate(X):
     print(i)
 
-    distances, indices = tree.query(x, k = 100, p = 2, distance_upper_bound = 1.0e+5)
-    print(indices)
+    for j, t in enumerate(trees):
+        distances, indices = t.query(x, k = 20, p = 2)
 
-    index0 = key_indices[keys[i]]
-    print(index0)
+        distance = np.mean(distances)
 
-    for d, j in zip(distances, indices):
-        if not np.isinf(d):
-            index1 = key_indices[keys[j]]
+        distance_matrix[i, j] = distance
+        distance_matrix[j, i] = distance
 
-            distance_matrix[index0, index1] += 1
-            distance_matrix[index1, index0] += 1
-            print("\t", index1)
-
-pickle.dump([sorted_keys, distance_matrix], open("clusterized.pickle", "wb"))
+pickle.dump([sorted_keys, distance_matrix], open("distance_matrix.pickle", "wb"))
