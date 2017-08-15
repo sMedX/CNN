@@ -1,0 +1,19 @@
+{
+    "aflw_sqlite_path": "/large/datasets/aflw/aflw/data/aflw.sqlite",
+    "aflw_imgdir_path": "/large/datasets/aflw/aflw/data/flickr",
+    "aflw_cache_path": "./aflw_cache.npz",
+    "aflw_test_rate": 0.041010499,
+    "resnet_caffemodel_path": "/large/datasets/ResNet/ResNet-50-model.caffemodel",
+    "gpu": 0,
+    "n_loaders_train": 7,
+    "n_loaders_test": 1,
+    "n_epoch": 1000,
+    "batchsize": 10,
+    "port_face": 8888,
+    "port_weight": 8889,
+    "port_lossgraph": 8890,
+    "port_evaluate": 8891,
+    "port_demo": 9000,
+    "outdir": "result",
+    "outdir_pretrain": "result_pretrain"
+}
