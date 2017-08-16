@@ -517,6 +517,10 @@ class BuildingBlock(link.Chain):
     def forward(self):
         return [getattr(self, name) for name in self._forward]
 
+    def copy_from(self, other):
+        for name in self._forward:
+            getattr(self, name).copy_from(getattr(other, name))
+
 
 class BottleneckA(link.Chain):
 
@@ -559,6 +563,16 @@ class BottleneckA(link.Chain):
         h2 = self.bn4(self.conv4(x))
         return relu(h1 + h2)
 
+    def copyparams(self, other):
+        self.conv1.copyparams(other.conv1)
+        self.bn1.copyparams(other.bn1)
+        self.conv2.copyparams(other.conv2)
+        self.bn2.copyparams(other.bn2)
+        self.conv3.copyparams(other.conv3)
+        self.bn3.copyparams(other.bn3)
+        self.conv4.copyparams(other.conv4)
+        self.bn4.copyparams(other.bn4)
+
 
 class BottleneckB(link.Chain):
 
@@ -592,6 +606,14 @@ class BottleneckB(link.Chain):
         h = relu(self.bn2(self.conv2(h)))
         h = self.bn3(self.conv3(h))
         return relu(h + x)
+
+    def copyparams(self, other):
+        self.conv1.copyparams(other.conv1)
+        self.bn1.copyparams(other.bn1)
+        self.conv2.copyparams(other.conv2)
+        self.bn2.copyparams(other.bn2)
+        self.conv3.copyparams(other.conv3)
+        self.bn3.copyparams(other.bn3)
 
 
 def global_average_pooling_2d(x):
@@ -659,7 +681,7 @@ def transfer_resnet101(src, dst):
     transfer_block(src, dst.res2, ['2a', '2b', '2c'])
     transfer_block(src, dst.res3, ['3a', '3b1', '3b2', '3b3'])
     transfer_block(src, dst.res4,
-                    ['4a'] + ['4b{}'.format(i) for i in range(1, 23)])
+                   ['4a'] + ['4b{}'.format(i) for i in range(1, 23)])
     transfer_block(src, dst.res5, ['5a', '5b', '5c'])
 
     dst.fc6.W.data[:] = src.fc1000.W.data
@@ -675,9 +697,9 @@ def transfer_resnet152(src, dst):
 
     transfer_block(src, dst.res2, ['2a', '2b', '2c'])
     transfer_block(src, dst.res3,
-                    ['3a'] + ['3b{}'.format(i) for i in range(1, 8)])
+                   ['3a'] + ['3b{}'.format(i) for i in range(1, 8)])
     transfer_block(src, dst.res4,
-                    ['4a'] + ['4b{}'.format(i) for i in range(1, 36)])
+                   ['4a'] + ['4b{}'.format(i) for i in range(1, 36)])
     transfer_block(src, dst.res5, ['5a', '5b', '5c'])
 
     dst.fc6.W.data[:] = src.fc1000.W.data

@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import cupy
 import chainer
 import chainer.functions as F
 import chainer.links as L
+from chainer.serializers import npz
 
-from resnet import BuildingBlock, transfer_block, global_average_pooling_2d
 from chainer.links.normalization.batch_normalization import BatchNormalization
+from chainer.functions.pooling.average_pooling_2d import average_pooling_2d
+from resnet import BuildingBlock, transfer_block, global_average_pooling_2d
 
 # logging
 from logging import getLogger, NullHandler
@@ -18,10 +21,14 @@ IMG_SIZE = (227, 227)
 
 
 def _disconnect(x):
-    return chainer.Variable(x.data, volatile=x.volatile)
+    with chainer.no_backprop_mode():
+        if isinstance(x, cupy.core.core.ndarray):
+            return chainer.Variable(x).data
+
+        return chainer.Variable(x.data).data
 
 
-def copy_layers(src, dst):
+def copy_layers_from_caffemodel(src, dst):
     dst.conv1.W.data[:] = src.conv1.W.data
     dst.conv1.b.data[:] = src.conv1.b.data
     dst.bn1.avg_mean[:] = src.bn_conv1.avg_mean
@@ -35,9 +42,18 @@ def copy_layers(src, dst):
     transfer_block(src, dst.res5, ['5a', '5b', '5c'])
 
 
+def copy_layers_from_pretrainedmodel(src, dst):
+    dst.conv1.copyparams(src.conv1)
+    dst.bn1.copyparams(src.bn1)
+    dst.res2.copyparams(src.res2)
+    dst.res3.copyparams(src.res3)
+    dst.res4.copyparams(src.res4)
+    dst.res5.copyparams(src.res5)
+
+
 class HyperFaceModel(chainer.Chain):
 
-    def __init__(self, loss_weights=(1.0, 100.0, 20.0, 5.0, 0.3), n_resnet_layers = 50):
+    def __init__(self, loss_weights=(1.0, 100.0, 20.0, 5.0, 0.3), n_resnet_layers=50):
         super(HyperFaceModel, self).__init__()
 
         if n_resnet_layers == 50:
@@ -59,18 +75,18 @@ class HyperFaceModel(chainer.Chain):
             self.res4 = BuildingBlock(resnet_block[2], 512, 256, 1024, 2)
             self.res5 = BuildingBlock(resnet_block[3], 1024, 512, 2048, 2)
             # Fusion CNN
-            self.conv_all=L.Convolution2D(768, 192, 1, stride=1, pad=0)
-            self.fc_full=L.Linear(6 * 6 * 192, 3072)
-            self.fc_detection1=L.Linear(3072, 512)
-            self.fc_detection2=L.Linear(512, 2)
-            self.fc_landmarks1=L.Linear(3072, 512)
-            self.fc_landmarks2=L.Linear(512, 42)
-            self.fc_visibility1=L.Linear(3072, 512)
-            self.fc_visibility2=L.Linear(512, 21)
-            self.fc_pose1=L.Linear(3072, 512)
-            self.fc_pose2=L.Linear(512, 3)
-            self.fc_gender1=L.Linear(3072, 512)
-            self.fc_gender2=L.Linear(512, 2)
+            self.conv_all = L.Convolution2D(2048, 192, 1, stride=1, pad=0)
+            self.fc_full = L.Linear(15 * 15 * 192, 3072)
+            self.fc_detection1 = L.Linear(3072, 512)
+            self.fc_detection2 = L.Linear(512, 2)
+            self.fc_landmarks1 = L.Linear(3072, 512)
+            self.fc_landmarks2 = L.Linear(512, 42)
+            self.fc_visibility1 = L.Linear(3072, 512)
+            self.fc_visibility2 = L.Linear(512, 21)
+            self.fc_pose1 = L.Linear(3072, 512)
+            self.fc_pose2 = L.Linear(512, 3)
+            self.fc_gender1 = L.Linear(3072, 512)
+            self.fc_gender2 = L.Linear(512, 2)
 
         self.train = True
         self.report = True
@@ -89,25 +105,26 @@ class HyperFaceModel(chainer.Chain):
         h = self.res5(h)
 
         # Fusion CNN
-        h = F.relu(self.conv_all(h))  # conv_all
-        h = F.relu(self.fc_full(h))  # fc_full
-        h = F.dropout(h, train=self.train)
+        with chainer.using_config('train', self.train):
+            h = F.relu(self.conv_all(h))
+            h = F.relu(self.fc_full(h))
+            h = F.dropout(h)
 
-        h_detection = F.relu(self.fc_detection1(h))
-        h_detection = F.dropout(h_detection, train=self.train)
-        h_detection = self.fc_detection2(h_detection)
-        h_landmark = F.relu(self.fc_landmarks1(h))
-        h_landmark = F.dropout(h_landmark, train=self.train)
-        h_landmark = self.fc_landmarks2(h_landmark)
-        h_visibility = F.relu(self.fc_visibility1(h))
-        h_visibility = F.dropout(h_visibility, train=self.train)
-        h_visibility = self.fc_visibility2(h_visibility)
-        h_pose = F.relu(self.fc_pose1(h))
-        h_pose = F.dropout(h_pose, train=self.train)
-        h_pose = self.fc_pose2(h_pose)
-        h_gender = F.relu(self.fc_gender1(h))
-        h_gender = F.dropout(h_gender, train=self.train)
-        h_gender = self.fc_gender2(h_gender)
+            h_detection = F.relu(self.fc_detection1(h))
+            h_detection = F.dropout(h_detection)
+            h_detection = self.fc_detection2(h_detection)
+            h_landmark = F.relu(self.fc_landmarks1(h))
+            h_landmark = F.dropout(h_landmark)
+            h_landmark = self.fc_landmarks2(h_landmark)
+            h_visibility = F.relu(self.fc_visibility1(h))
+            h_visibility = F.dropout(h_visibility)
+            h_visibility = self.fc_visibility2(h_visibility)
+            h_pose = F.relu(self.fc_pose1(h))
+            h_pose = F.dropout(h_pose)
+            h_pose = self.fc_pose2(h_pose)
+            h_gender = F.relu(self.fc_gender1(h))
+            h_gender = F.dropout(h_gender)
+            h_gender = self.fc_gender2(h_gender)
 
         # Mask and Loss
         if self.backward:
@@ -143,8 +160,8 @@ class HyperFaceModel(chainer.Chain):
                     loss_pose + loss_gender)
 
         # Prediction (the same shape as t_**, and [0:1])
-        h_detection = F.softmax(h_detection)[:, 1] # ([[y, n]] -> [d])
-        h_gender = F.softmax(h_gender)[:, 1] # ([[m, f]] -> [g])
+        h_detection = F.softmax(h_detection)[:, 1]  # ([[y, n]] -> [d])
+        h_gender = F.softmax(h_gender)[:, 1]  # ([[m, f]] -> [g])
 
         if self.report:
             if self.backward:
@@ -183,7 +200,7 @@ class HyperFaceModel(chainer.Chain):
 
 class RCNNFaceModel(chainer.Chain):
 
-    def __init__(self, n_resnet_layers = 50):
+    def __init__(self, n_resnet_layers=50):
         super(RCNNFaceModel, self).__init__()
 
         if n_resnet_layers == 50:
@@ -204,9 +221,10 @@ class RCNNFaceModel(chainer.Chain):
             self.res3 = BuildingBlock(resnet_block[1], 256, 128, 512, 2)
             self.res4 = BuildingBlock(resnet_block[2], 512, 256, 1024, 2)
             self.res5 = BuildingBlock(resnet_block[3], 1024, 512, 2048, 2)
-            self.fc6=L.Linear(2048, 1024)
-            self.fc7=L.Linear(1024, 512)
-            self.fc8=L.Linear(512, 2)
+            # RCNN
+            self.fc6 = L.Linear(2048, 1024)
+            self.fc7 = L.Linear(1024, 512)
+            self.fc8 = L.Linear(512, 2)
 
         self.train = True
 
@@ -220,9 +238,9 @@ class RCNNFaceModel(chainer.Chain):
         h = global_average_pooling_2d(h)
 
         # RCNN
-        # TODO "..., train=self.train"
-        h = F.dropout(F.relu(self.fc6(h)))  # fc6
-        h = F.dropout(F.relu(self.fc7(h)))  # fc7
+        with chainer.using_config('train', self.train):
+            h = F.dropout(F.relu(self.fc6(h)))  # fc6
+            h = F.dropout(F.relu(self.fc7(h)))  # fc7
         h_detection = self.fc8(h)  # fc8
 
         # Loss

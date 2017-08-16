@@ -19,7 +19,7 @@ from extensions import SequentialEvaluator
 from imgviewer_conversions import face_img_func, weights_img_func
 from imgviewer_conversions import lossgraph_entry_func, lossgraph_img_func
 import models
-from models import copy_layers
+from models import copy_layers_from_caffemodel, copy_layers_from_pretrainedmodel
 
 # logging
 from logging import getLogger, DEBUG
@@ -71,14 +71,14 @@ if __name__ == '__main__':
             logger.info('Overwrite conv layers using caffemodel "{}"'
                         .format(config.resnet_caffemodel_path))
             caffe_model = CaffeFunction(config.resnet_caffemodel_path)
-            copy_layers(caffe_model, model)
+            copy_layers_from_caffemodel(caffe_model, model)
         elif not args.pretrain and args.pretrainedmodel:
             # Initialize using pretrained model
             logger.info('Overwrite conv layers using pretraindmodel "{}"'
                         .format(args.pretrainedmodel))
             pre_model = models.RCNNFaceModel()
             chainer.serializers.load_npz(args.pretrainedmodel, pre_model)
-            copy_layers(pre_model, model)
+            copy_layers_from_pretrainedmodel(pre_model, model)
 
     # Setup GPU
     if config.gpu >= 0:
@@ -154,11 +154,11 @@ if __name__ == '__main__':
         port=config.port_face, image_func=face_img_func),
         trigger=imgview_face_interval)
     # Image Viewer for weights
-    trainer.extend(ImgViewerExtention(
-        ['main/conv1_w', 'main/conv2_w', 'main/conv3_w', 'main/conv4_w',
-         'main/conv5_w', ], n_imgs=[96, 0, 0, 0, 0],
-        port=config.port_weight, image_func=weights_img_func),
-        trigger=imgview_weight_interval)
+    # trainer.extend(ImgViewerExtention(
+    #     ['main/conv1_w', 'main/conv2_w', 'main/conv3_w', 'main/conv4_w',
+    #      'main/conv5_w', ], n_imgs=[96, 0, 0, 0, 0],
+    #     port=config.port_weight, image_func=weights_img_func),
+    #     trigger=imgview_weight_interval)
     # Image Viewer for loss graph
     trainer.extend(ImgViewerExtention(
         ['lossgraph'], n_imgs=[1] if args.pretrain else [1 + 5],

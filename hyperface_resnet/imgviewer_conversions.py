@@ -31,12 +31,12 @@ def face_img_func(key, entry, viewer):
         if 0.0 <= detection_raw <= 1.0:
             drawing.draw_detection(img, detection)
 
-        landmark = entry['landmark'][0]
-        visibility = entry['visibility'][0]
+        landmark = chainer.cuda.to_cpu(entry['landmark'][0])
+        visibility = chainer.cuda.to_cpu(entry['visibility'][0])
         landmark_color = (0, 1, 0) if detection == 1 else (0, 0, 1)
         drawing.draw_landmark(img, landmark, visibility, landmark_color, 0.5)
 
-        pose = entry['pose'][0]
+        pose = chainer.cuda.to_cpu(entry['pose'][0])
         drawing.draw_pose(img, pose)
 
         gender = entry['gender'][0]
