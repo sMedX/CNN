@@ -22,41 +22,29 @@ except Exception as e:
 
 
 def _draw_line(img, pt1, pt2, color, thickness=2):
-    try:
-        pt1 = (int(pt1[0]), int(pt1[1]))
-        pt2 = (int(pt2[0]), int(pt2[1]))
-        cv2.line(img, pt1, pt2, color, int(thickness))
-    except:
-        logger.error(sys.exc_info()[0])
+    pt1 = (int(pt1[0]), int(pt1[1]))
+    pt2 = (int(pt2[0]), int(pt2[1]))
+    cv2.line(img, pt1, pt2, color, int(thickness))
 
 
 def _draw_circle(img, pt, color, radius=4, thickness=-1):
-    try:
-        pt = (int(pt[0]), int(pt[1]))
-        cv2.circle(img, pt, radius, color, int(thickness))
-    except:
-        logger.error(sys.exc_info()[0])
+    pt = (int(pt[0]), int(pt[1]))
+    cv2.circle(img, pt, radius, color, int(thickness))
 
 
 def _draw_rect(img, rect, color, thickness=2):
-    try:
-        p1 = (int(rect[0]), int(rect[1]))
-        p2 = (int(rect[0] + rect[2]), int(rect[1] + rect[3]))
-        cv2.rectangle(img, p1, p2, color, thickness)
-    except:
-        logger.error(sys.exc_info()[0])
+    p1 = (int(rect[0]), int(rect[1]))
+    p2 = (int(rect[0] + rect[2]), int(rect[1] + rect[3]))
+    cv2.rectangle(img, p1, p2, color, thickness)
 
 
 def _draw_cross(img, pt, color, size=4, thickness=2):
-    try:
-        p0 = (pt[0] - size, pt[1] - size)
-        p1 = (pt[0] + size, pt[1] + size)
-        p2 = (pt[0] + size, pt[1] - size)
-        p3 = (pt[0] - size, pt[1] + size)
-        _draw_line(img, p0, p1, color, thickness)
-        _draw_line(img, p2, p3, color, thickness)
-    except:
-        logger.error(sys.exc_info()[0])
+    p0 = (pt[0] - size, pt[1] - size)
+    p1 = (pt[0] + size, pt[1] + size)
+    p2 = (pt[0] + size, pt[1] - size)
+    p3 = (pt[0] - size, pt[1] + size)
+    _draw_line(img, p0, p1, color, thickness)
+    _draw_line(img, p2, p3, color, thickness)
 
 
 def _rotation_matrix(rad_x, rad_y, rad_z):
