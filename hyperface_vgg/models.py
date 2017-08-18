@@ -29,13 +29,26 @@ class HyperFaceModel(chainer.Chain):
 
     def __init__(self, loss_weights=(1.0, 100.0, 20.0, 5.0, 0.3)):
         super(HyperFaceModel, self).__init__(
-            conv1=L.Convolution2D(3, 96, 11, stride=4, pad=0),
-            conv1a=L.Convolution2D(96, 256, 4, stride=4, pad=0),
-            conv2=L.Convolution2D(96, 256, 5, stride=1, pad=2),
-            conv3=L.Convolution2D(256, 384, 3, stride=1, pad=1),
-            conv3a=L.Convolution2D(384, 256, 2, stride=2, pad=0),
-            conv4=L.Convolution2D(384, 384, 3, stride=1, pad=1),
-            conv5=L.Convolution2D(384, 256, 3, stride=1, pad=1),
+            conv1_1=L.Convolution2D(3, 64, 3, stride=1, pad=1),
+            conv1_2=L.Convolution2D(64, 64, 3, stride=1, pad=1),
+            conv1_a=L.Convolution2D(96, 256, 4, stride=4, pad=0),
+
+            conv2_1=L.Convolution2D(64, 128, 3, stride=1, pad=1),
+            conv2_2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+
+            conv3_1=L.Convolution2D(128, 256, 3, stride=1, pad=1),
+            conv3_2=L.Convolution2D(256, 256, 3, stride=1, pad=1),
+            conv3_3=L.Convolution2D(256, 256, 3, stride=1, pad=1),
+            conv3_a=L.Convolution2D(384, 256, 2, stride=2, pad=0),
+
+            conv4_1=L.Convolution2D(256, 512, 3, stride=1, pad=1),
+            conv4_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv4_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+
+            conv5_1=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv5_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv5_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+
             conv_all=L.Convolution2D(768, 192, 1, stride=1, pad=0),
             fc_full=L.Linear(6 * 6 * 192, 3072),
             fc_detection1=L.Linear(3072, 512),
@@ -58,19 +71,31 @@ class HyperFaceModel(chainer.Chain):
     def __call__(self, x_img, t_detection=None, t_landmark=None,
                  t_visibility=None, t_pose=None, t_gender=None,
                  m_landmark=None, m_visibility=None, m_pose=None):
-        # Alexnet
-        h = F.relu(self.conv1(x_img))  # conv1
-        h = F.max_pooling_2d(h, 3, stride=2, pad=0)  # max1
-        h = F.local_response_normalization(h)  # norm1
-        h1 = F.relu(self.conv1a(h))  # conv1a
-        h = F.relu(self.conv2(h))  # conv2
-        h = F.max_pooling_2d(h, 3, stride=2, pad=0)  # max2
-        h = F.local_response_normalization(h)  # norm2
-        h = F.relu(self.conv3(h))  # conv3
-        h2 = F.relu(self.conv3a(h))  # conv3a
-        h = F.relu(self.conv4(h))  # conv4
-        h = F.relu(self.conv5(h))  # conv5
-        h = F.max_pooling_2d(h, 3, stride=2, pad=0)  # pool5
+        # VGG
+        h = F.relu(self.conv1_1(x))
+        h = F.relu(self.conv1_2(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+        h1 = F.relu(self.conv1_a(h))
+
+        h = F.relu(self.conv2_1(h))
+        h = F.relu(self.conv2_2(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.relu(self.conv3_1(h))
+        h = F.relu(self.conv3_2(h))
+        h = F.relu(self.conv3_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+        h2 = F.relu(self.conv3_a(h))
+
+        h = F.relu(self.conv4_1(h))
+        h = F.relu(self.conv4_2(h))
+        h = F.relu(self.conv4_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.relu(self.conv5_1(h))
+        h = F.relu(self.conv5_2(h))
+        h = F.relu(self.conv5_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
 
         h = F.concat((h1, h2, h))
 
@@ -129,8 +154,8 @@ class HyperFaceModel(chainer.Chain):
                     loss_pose + loss_gender)
 
         # Prediction (the same shape as t_**, and [0:1])
-        h_detection = F.softmax(h_detection)[:, 1] # ([[y, n]] -> [d])
-        h_gender = F.softmax(h_gender)[:, 1] # ([[m, f]] -> [g])
+        h_detection = F.softmax(h_detection)[:, 1]  # ([[y, n]] -> [d])
+        h_gender = F.softmax(h_gender)[:, 1]  # ([[m, f]] -> [g])
 
         if self.report:
             if self.backward:
