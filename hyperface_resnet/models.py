@@ -72,12 +72,16 @@ class HyperFaceModel(chainer.Chain):
             self.conv1 = L.Convolution2D(3, 64, 7, 2, 3)
             self.bn1 = BatchNormalization(64)
             self.res2 = BuildingBlock(resnet_block[0], 64, 64, 256, 1)
+            self.res2a = L.Convolution2D(256, 512, 4, stride=16, pad=0)
             self.res3 = BuildingBlock(resnet_block[1], 256, 128, 512, 2)
+            self.res3a=L.Convolution2D(512, 512, 4, stride=8, pad=0)
             self.res4 = BuildingBlock(resnet_block[2], 512, 256, 1024, 2)
+            self.res4a=L.Convolution2D(1024, 512, 4, stride=4, pad=1)
             self.res5 = BuildingBlock(resnet_block[3], 1024, 512, 2048, 2)
+            self.res5a=L.Convolution2D(2048, 512, 4, stride=2, pad=1)
             # Fusion CNN
             self.conv_all = L.Convolution2D(2048, 192, 1, stride=1, pad=0)
-            self.fc_full = L.Linear(15 * 15 * 192, 3072)
+            self.fc_full = L.Linear(7 * 7 * 192, 3072)
             self.fc_detection1 = L.Linear(3072, 512)
             self.fc_detection2 = L.Linear(512, 2)
             self.fc_landmarks1 = L.Linear(3072, 512)
@@ -100,14 +104,25 @@ class HyperFaceModel(chainer.Chain):
                  m_landmark=None, m_visibility=None, m_pose=None):
         # ResNet
         h = self.bn1(self.conv1(x_img))
+
         h = self.res2(h)
+        h2 = F.relu(self.res2a(h))
+
         h = self.res3(h)
+        h3 = F.relu(self.res3a(h))
+
         h = self.res4(h)
+        h4 = F.relu(self.res4a(h))
+
         h = self.res5(h)
+        h5 = F.relu(self.res5a(h))
+
+        h = F.concat((h2, h3, h4, h5))
 
         # Fusion CNN
         with chainer.using_config('train', self.train):
             h = F.relu(self.conv_all(h))
+
             h = F.relu(self.fc_full(h))
             h = F.dropout(h)
 
