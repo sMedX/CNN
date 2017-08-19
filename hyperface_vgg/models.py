@@ -31,7 +31,6 @@ class HyperFaceModel(chainer.Chain):
         super(HyperFaceModel, self).__init__(
             conv1_1=L.Convolution2D(3, 64, 3, stride=1, pad=1),
             conv1_2=L.Convolution2D(64, 64, 3, stride=1, pad=1),
-            conv1_a=L.Convolution2D(96, 256, 4, stride=4, pad=0),
 
             conv2_1=L.Convolution2D(64, 128, 3, stride=1, pad=1),
             conv2_2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
@@ -39,18 +38,19 @@ class HyperFaceModel(chainer.Chain):
             conv3_1=L.Convolution2D(128, 256, 3, stride=1, pad=1),
             conv3_2=L.Convolution2D(256, 256, 3, stride=1, pad=1),
             conv3_3=L.Convolution2D(256, 256, 3, stride=1, pad=1),
-            conv3_a=L.Convolution2D(384, 256, 2, stride=2, pad=0),
+            conv3_a=L.Convolution2D(256, 512, 4, stride=4, pad=2),
 
             conv4_1=L.Convolution2D(256, 512, 3, stride=1, pad=1),
             conv4_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
             conv4_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv4_a=L.Convolution2D(512, 256, 2, stride=2, pad=1),
 
             conv5_1=L.Convolution2D(512, 512, 3, stride=1, pad=1),
             conv5_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
             conv5_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
 
             conv_all=L.Convolution2D(768, 192, 1, stride=1, pad=0),
-            fc_full=L.Linear(6 * 6 * 192, 3072),
+            fc_full=L.Linear(7 * 7 * 192, 3072),
             fc_detection1=L.Linear(3072, 512),
             fc_detection2=L.Linear(512, 2),
             fc_landmarks1=L.Linear(3072, 512),
@@ -72,10 +72,9 @@ class HyperFaceModel(chainer.Chain):
                  t_visibility=None, t_pose=None, t_gender=None,
                  m_landmark=None, m_visibility=None, m_pose=None):
         # VGG
-        h = F.relu(self.conv1_1(x))
+        h = F.relu(self.conv1_1(x_img))
         h = F.relu(self.conv1_2(h))
         h = F.max_pooling_2d(h, 2, stride=2)
-        h1 = F.relu(self.conv1_a(h))
 
         h = F.relu(self.conv2_1(h))
         h = F.relu(self.conv2_2(h))
@@ -85,19 +84,21 @@ class HyperFaceModel(chainer.Chain):
         h = F.relu(self.conv3_2(h))
         h = F.relu(self.conv3_3(h))
         h = F.max_pooling_2d(h, 2, stride=2)
-        h2 = F.relu(self.conv3_a(h))
+        h3 = F.relu(self.conv3_a(h))
 
         h = F.relu(self.conv4_1(h))
         h = F.relu(self.conv4_2(h))
         h = F.relu(self.conv4_3(h))
         h = F.max_pooling_2d(h, 2, stride=2)
+        h4 = F.relu(self.conv4_a(h))
 
         h = F.relu(self.conv5_1(h))
         h = F.relu(self.conv5_2(h))
         h = F.relu(self.conv5_3(h))
         h = F.max_pooling_2d(h, 2, stride=2)
 
-        h = F.concat((h1, h2, h))
+        print(h3.shape, h4.shape, h.shape)
+        h = F.concat((h3, h4, h))
 
         # Fusion CNN
         h = F.relu(self.conv_all(h))  # conv_all
