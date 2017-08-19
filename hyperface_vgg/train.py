@@ -66,11 +66,11 @@ if __name__ == '__main__':
 
     # Initialize model
     if not args.resume:
-        if args.pretrain and config.alexnet_caffemodel_path:
+        if args.pretrain and config.vgg_caffemodel_path:
             # Initialize using caffemodel
             logger.info('Overwrite conv layers using caffemodel "{}"'
-                        .format(config.alexnet_caffemodel_path))
-            caffe_model = CaffeFunction(config.alexnet_caffemodel_path)
+                        .format(config.vgg_caffemodel_path))
+            caffe_model = CaffeFunction(config.vgg_caffemodel_path)
             copy_layers(caffe_model, model)
         elif not args.pretrain and args.pretrainedmodel:
             # Initialize using pretrained model

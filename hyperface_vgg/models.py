@@ -24,7 +24,11 @@ def _disconnect(x):
 
 
 def copy_layers(src_model, dst_model,
-                names=['conv1', 'conv2', 'conv3', 'conv4', 'conv5']):
+                names=['conv1_1', 'conv1_2',
+                       'conv2_1', 'conv2_2',
+                       'conv3_1', 'conv3_2', 'conv3_3',
+                       'conv4_1', 'conv4_2', 'conv4_3',
+                       'conv5_1', 'conv5_2', 'conv5_3']):
     for name in names:
         for s, d in zip(src_model[name].params(), dst_model[name].params()):
             d.data = s.data
@@ -207,32 +211,65 @@ class RCNNFaceModel(chainer.Chain):
 
     def __init__(self):
         super(RCNNFaceModel, self).__init__(
-            conv1=L.Convolution2D(3, 96, 11, stride=4, pad=0),
-            conv2=L.Convolution2D(96, 256, 5, stride=1, pad=2),
-            conv3=L.Convolution2D(256, 384, 3, stride=1, pad=1),
-            conv4=L.Convolution2D(384, 384, 3, stride=1, pad=1),
-            conv5=L.Convolution2D(384, 256, 3, stride=1, pad=1),
-            fc6=L.Linear(6 * 6 * 256, 4096),
+            conv1_1=L.Convolution2D(3, 64, 3, stride=1, pad=1),
+            conv1_2=L.Convolution2D(64, 64, 3, stride=1, pad=1),
+
+            conv2_1=L.Convolution2D(64, 128, 3, stride=1, pad=1),
+            conv2_2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+
+            conv3_1=L.Convolution2D(128, 256, 3, stride=1, pad=1),
+            conv3_2=L.Convolution2D(256, 256, 3, stride=1, pad=1),
+            conv3_3=L.Convolution2D(256, 256, 3, stride=1, pad=1),
+
+            conv4_1=L.Convolution2D(256, 512, 3, stride=1, pad=1),
+            conv4_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv4_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+
+            conv5_1=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv5_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv5_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+
+            fc6=L.Linear(8 * 8 * 512, 4096),
             fc7=L.Linear(4096, 512),
             fc8=L.Linear(512, 2),
         )
         self.train = True
 
     def __call__(self, x_img, t_detection, **others):
-        # Alexnet
-        h = F.relu(self.conv1(x_img))  # conv1
-        h = F.max_pooling_2d(h, 3, stride=2, pad=0)  # max1
-        h = F.local_response_normalization(h)  # norm1
-        h = F.relu(self.conv2(h))  # conv2
-        h = F.max_pooling_2d(h, 3, stride=2, pad=0)  # max2
-        h = F.local_response_normalization(h)  # norm2
-        h = F.relu(self.conv3(h))  # conv3
-        h = F.relu(self.conv4(h))  # conv4
-        h = F.relu(self.conv5(h))  # conv5
-        h = F.max_pooling_2d(h, 3, stride=2, pad=0)  # pool5
+        # VGG
+        h = F.relu(self.conv1_1(x_img))
+        h = F.relu(self.conv1_2(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
 
-        h = F.dropout(F.relu(self.fc6(h)), train=self.train)  # fc6
-        h = F.dropout(F.relu(self.fc7(h)), train=self.train)  # fc7
+        h = F.relu(self.conv2_1(h))
+        h = F.relu(self.conv2_2(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.relu(self.conv3_1(h))
+        h = F.relu(self.conv3_2(h))
+        h = F.relu(self.conv3_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.relu(self.conv4_1(h))
+        h = F.relu(self.conv4_2(h))
+        h = F.relu(self.conv4_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.relu(self.conv5_1(h))
+        h = F.relu(self.conv5_2(h))
+        h = F.relu(self.conv5_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        # fc6
+        h = F.relu(self.fc6(h))
+        with chainer.using_config('train', self.train):
+            h = F.dropout(h)
+
+        # fc7
+        h = F.relu(self.fc7(h))
+        with chainer.using_config('train', self.train):
+            h = F.dropout(h)
+
         h_detection = self.fc8(h)  # fc8
 
         # Loss
@@ -250,10 +287,10 @@ class RCNNFaceModel(chainer.Chain):
         chainer.report({'teacher': teacher_data}, self)
 
         # Report layer weights
-        chainer.report({'conv1_w': {'weights': self.conv1.W},
-                        'conv2_w': {'weights': self.conv2.W},
-                        'conv3_w': {'weights': self.conv3.W},
-                        'conv4_w': {'weights': self.conv4.W},
-                        'conv5_w': {'weights': self.conv5.W}}, self)
+        chainer.report({'conv1_1_w': {'weights': self.conv1_1.W},
+                        'conv2_1_w': {'weights': self.conv2_1.W},
+                        'conv3_1_w': {'weights': self.conv3_1.W},
+                        'conv4_1_w': {'weights': self.conv4_1.W},
+                        'conv5_1_w': {'weights': self.conv5_1.W}}, self)
 
         return loss
