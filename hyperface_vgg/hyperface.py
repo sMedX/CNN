@@ -45,7 +45,8 @@ def _forward_with_rects(model, img_org, rects, batchsize, xp):
     for i in six.moves.xrange(0, len(cropped_imgs), batchsize):
         # Create batch
         batch = xp.asarray(cropped_imgs[i:i + batchsize], dtype=np.float32)
-        x = chainer.Variable(batch, volatile=True)
+        with chainer.no_backprop_mode():
+            x = chainer.Variable(batch)
         # Forward
         y = model(x)
         # Chainer.Variable -> np.ndarray

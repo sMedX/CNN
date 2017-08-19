@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import cupy
 import chainer
 import chainer.functions as F
 import chainer.links as L
@@ -11,11 +12,15 @@ logger.addHandler(NullHandler())
 
 # Constant variables
 N_LANDMARK = 21
-IMG_SIZE = (227, 227)
+IMG_SIZE = (224, 224)
 
 
 def _disconnect(x):
-    return chainer.Variable(x.data, volatile=x.volatile)
+    with chainer.no_backprop_mode():
+        if isinstance(x, cupy.core.core.ndarray):
+            return chainer.Variable(x).data
+
+        return chainer.Variable(x.data).data
 
 
 def copy_layers(src_model, dst_model,
@@ -49,8 +54,8 @@ class HyperFaceModel(chainer.Chain):
             conv5_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
             conv5_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
 
-            conv_all=L.Convolution2D(768, 192, 1, stride=1, pad=0),
-            fc_full=L.Linear(7 * 7 * 192, 3072),
+            conv_all=L.Convolution2D(1280, 192, 1, stride=1, pad=0),
+            fc_full=L.Linear(8 * 8 * 192, 3072),
             fc_detection1=L.Linear(3072, 512),
             fc_detection2=L.Linear(512, 2),
             fc_landmarks1=L.Linear(3072, 512),
@@ -97,28 +102,33 @@ class HyperFaceModel(chainer.Chain):
         h = F.relu(self.conv5_3(h))
         h = F.max_pooling_2d(h, 2, stride=2)
 
-        print(h3.shape, h4.shape, h.shape)
         h = F.concat((h3, h4, h))
 
         # Fusion CNN
         h = F.relu(self.conv_all(h))  # conv_all
         h = F.relu(self.fc_full(h))  # fc_full
-        h = F.dropout(h, train=self.train)
+        with chainer.using_config('train', self.train):
+            h = F.dropout(h)
 
         h_detection = F.relu(self.fc_detection1(h))
-        h_detection = F.dropout(h_detection, train=self.train)
+        with chainer.using_config('train', self.train):
+            h_detection = F.dropout(h_detection)
         h_detection = self.fc_detection2(h_detection)
         h_landmark = F.relu(self.fc_landmarks1(h))
-        h_landmark = F.dropout(h_landmark, train=self.train)
+        with chainer.using_config('train', self.train):
+            h_landmark = F.dropout(h_landmark)
         h_landmark = self.fc_landmarks2(h_landmark)
         h_visibility = F.relu(self.fc_visibility1(h))
-        h_visibility = F.dropout(h_visibility, train=self.train)
+        with chainer.using_config('train', self.train):
+            h_visibility = F.dropout(h_visibility)
         h_visibility = self.fc_visibility2(h_visibility)
         h_pose = F.relu(self.fc_pose1(h))
-        h_pose = F.dropout(h_pose, train=self.train)
+        with chainer.using_config('train', self.train):
+            h_pose = F.dropout(h_pose)
         h_pose = self.fc_pose2(h_pose)
         h_gender = F.relu(self.fc_gender1(h))
-        h_gender = F.dropout(h_gender, train=self.train)
+        with chainer.using_config('train', self.train):
+            h_gender = F.dropout(h_gender)
         h_gender = self.fc_gender2(h_gender)
 
         # Mask and Loss
@@ -179,11 +189,11 @@ class HyperFaceModel(chainer.Chain):
             chainer.report({'teacher': teacher_data}, self)
 
             # Report layer weights
-            chainer.report({'conv1_w': {'weights': self.conv1.W},
-                            'conv2_w': {'weights': self.conv2.W},
-                            'conv3_w': {'weights': self.conv3.W},
-                            'conv4_w': {'weights': self.conv4.W},
-                            'conv5_w': {'weights': self.conv5.W}}, self)
+            chainer.report({'conv1_1_w': {'weights': self.conv1_1.W},
+                            'conv2_1_w': {'weights': self.conv2_1.W},
+                            'conv3_1_w': {'weights': self.conv3_1.W},
+                            'conv4_1_w': {'weights': self.conv4_1.W},
+                            'conv5_1_w': {'weights': self.conv5_1.W}}, self)
 
         if self.backward:
             return loss
