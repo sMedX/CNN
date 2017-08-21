@@ -90,6 +90,7 @@ if __name__ == '__main__':
     logger.info('Setup an optimizer')
     optimizer = chainer.optimizers.MomentumSGD(lr=0.01, momentum=0.9)
     optimizer.setup(model)
+    optimizer.add_hook(chainer.optimizer.GradientClipping(1.0))
 
     # Setup iterators
     # (test_iter needs repeat because of SequentialEvaluator())

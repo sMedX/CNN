@@ -27,17 +27,19 @@ class SequentialEvaluator(extensions.Evaluator):
 
         observation = {}
         with reporter_module.report_scope(observation):
-            with chainer.no_backprop_mode():
-                in_arrays = self.converter(batch, self.device)
-                if isinstance(in_arrays, tuple):
+            in_arrays = self.converter(batch, self.device)
+            if isinstance(in_arrays, tuple):
+                with chainer.no_backprop_mode():
                     in_vars = tuple(variable.Variable(x) for x in in_arrays)
-                    eval_func(*in_vars)
-                elif isinstance(in_arrays, dict):
+                eval_func(*in_vars)
+            elif isinstance(in_arrays, dict):
+                with chainer.no_backprop_mode():
                     in_vars = {key: variable.Variable(x)
                                for key, x in six.iteritems(in_arrays)}
                     eval_func(**in_vars)
-                else:
+            else:
+                with chainer.no_backprop_mode():
                     in_var = variable.Variable(in_arrays)
-                    eval_func(in_var)
+                eval_func(in_var)
 
         return observation
