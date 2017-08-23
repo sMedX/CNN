@@ -1,8 +1,16 @@
 {
+    "dataset": "menpo",
     "aflw_sqlite_path": "/large/datasets/aflw/aflw/data/aflw.sqlite",
     "aflw_imgdir_path": "/large/datasets/aflw/aflw/data/flickr",
     "aflw_cache_path": "./aflw_cache.npz",
     "aflw_test_rate": 0.041010499,
+    "menpo_train_paths": [
+        "/large/datasets/300W/01_Indoor",
+        "/large/datasets/300W/02_Outdoor",
+        "/large/datasets/menpo/train"
+    ],
+    "menpo_test_rate": 0.05,
+    "menpo_cache_path": "./menpo_cache.npz",
     "vgg_caffemodel_path": "/large/datasets/VGG/VGG_ILSVRC_16_layers.caffemodel",
     "gpu": 0,
     "n_loaders_train": 7,

@@ -13,7 +13,8 @@ import os
 import log_initializer
 
 import config
-import datasets
+import aflw_dataset
+import menpo_dataset
 from extensions import ImgViewerExtention
 from extensions import SequentialEvaluator
 from imgviewer_conversions import face_img_func, weights_img_func
@@ -50,11 +51,16 @@ if __name__ == '__main__':
     # Load config
     config.load(args.config)
 
-    # Setup AFLW dataset
-    train, test = datasets.setup_aflw(config.aflw_cache_path,
-                                      config.aflw_sqlite_path,
-                                      config.aflw_imgdir_path,
-                                      config.aflw_test_rate)
+    if config.dataset == "aflw":
+        # Setup AFLW dataset
+        train, test = aflw_dataset.setup_aflw(config.aflw_cache_path,
+                                              config.aflw_sqlite_path,
+                                              config.aflw_imgdir_path,
+                                              config.aflw_test_rate)
+    elif config.dataset == "menpo":
+        train, test = menpo_dataset.setup_menpo(config.menpo_cache_path,
+                                                config.menpo_train_paths,
+                                                config.menpo_test_rate)
 
     # Define a model
     if args.pretrain:
