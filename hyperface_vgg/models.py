@@ -11,7 +11,7 @@ logger = getLogger(__name__)
 logger.addHandler(NullHandler())
 
 # Constant variables
-N_LANDMARK = 21
+N_LANDMARK = 68
 IMG_SIZE = (224, 224)
 
 
@@ -205,6 +205,119 @@ class HyperFaceModel(chainer.Chain):
             return {'img': x_img, 'detection': h_detection,
                     'landmark': h_landmark, 'visibility': h_visibility,
                     'pose': h_pose, 'gender': h_gender}
+
+class HyperFaceMenpoModel(chainer.Chain):
+
+    def __init__(self):
+        super(HyperFaceMenpoModel, self).__init__(
+            conv1_1=L.Convolution2D(3, 64, 3, stride=1, pad=1),
+            conv1_2=L.Convolution2D(64, 64, 3, stride=1, pad=1),
+
+            conv2_1=L.Convolution2D(64, 128, 3, stride=1, pad=1),
+            conv2_2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+
+            conv3_1=L.Convolution2D(128, 256, 3, stride=1, pad=1),
+            conv3_2=L.Convolution2D(256, 256, 3, stride=1, pad=1),
+            conv3_3=L.Convolution2D(256, 256, 3, stride=1, pad=1),
+            conv3_a=L.Convolution2D(256, 512, 4, stride=4, pad=2),
+
+            conv4_1=L.Convolution2D(256, 512, 3, stride=1, pad=1),
+            conv4_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv4_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv4_a=L.Convolution2D(512, 256, 2, stride=2, pad=1),
+
+            conv5_1=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv5_2=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+            conv5_3=L.Convolution2D(512, 512, 3, stride=1, pad=1),
+
+            conv_all=L.Convolution2D(1280, 192, 1, stride=1, pad=0),
+
+            fc_full=L.Linear(8 * 8 * 192, 3072),
+            fc_landmarks1=L.Linear(3072, 1024),
+            fc_landmarks2=L.Linear(1024, 68),
+        )
+        self.train = True
+        self.report = True
+        self.backward = True
+
+    def __call__(self, x_img, t_landmark=None, m_landmark=None):
+        # VGG
+        h = F.relu(self.conv1_1(x_img))
+        h = F.relu(self.conv1_2(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.relu(self.conv2_1(h))
+        h = F.relu(self.conv2_2(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.relu(self.conv3_1(h))
+        h = F.relu(self.conv3_2(h))
+        h = F.relu(self.conv3_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+        h3 = F.relu(self.conv3_a(h))
+
+        h = F.relu(self.conv4_1(h))
+        h = F.relu(self.conv4_2(h))
+        h = F.relu(self.conv4_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+        h4 = F.relu(self.conv4_a(h))
+
+        h = F.relu(self.conv5_1(h))
+        h = F.relu(self.conv5_2(h))
+        h = F.relu(self.conv5_3(h))
+        h = F.max_pooling_2d(h, 2, stride=2)
+
+        h = F.concat((h3, h4, h))
+
+        # Fusion CNN
+        h = F.relu(self.conv_all(h))  # conv_all
+        h = F.relu(self.fc_full(h))  # fc_full
+        with chainer.using_config('train', self.train):
+            h = F.dropout(h)
+
+        h_landmark = F.relu(self.fc_landmarks1(h))
+        with chainer.using_config('train', self.train):
+            h_landmark = F.dropout(h_landmark)
+
+        # Mask and Loss
+        if self.backward:
+            # Landmark masking with visibility
+            m_landmark_ew = F.stack((t_visibility, t_visibility), axis=2)
+            m_landmark_ew = F.reshape(m_landmark_ew, (-1, N_LANDMARK * 2))
+
+            # Masking
+            h_landmark *= _disconnect(m_landmark)
+            t_landmark *= _disconnect(m_landmark)
+            h_landmark *= _disconnect(m_landmark_ew)
+            t_landmark *= _disconnect(m_landmark_ew)
+
+            # Loss
+            loss_landmark = F.mean_squared_error(h_landmark, t_landmark)
+
+            loss = loss_landmark
+
+        if self.report:
+            if self.backward:
+                # Report losses
+                chainer.report({'loss': loss}, self)
+
+            # Report results
+            predict_data = {'img': x_img, 'landmark': h_landmark}
+            teacher_data = {'img': x_img, 'landmark': t_landmark}
+            chainer.report({'predict': predict_data}, self)
+            chainer.report({'teacher': teacher_data}, self)
+
+            # Report layer weights
+            chainer.report({'conv1_1_w': {'weights': self.conv1_1.W},
+                            'conv2_1_w': {'weights': self.conv2_1.W},
+                            'conv3_1_w': {'weights': self.conv3_1.W},
+                            'conv4_1_w': {'weights': self.conv4_1.W},
+                            'conv5_1_w': {'weights': self.conv5_1.W}}, self)
+
+        if self.backward:
+            return loss
+        else:
+            return {'img': x_img, 'landmark': h_landmark}
 
 
 class RCNNFaceModel(chainer.Chain):

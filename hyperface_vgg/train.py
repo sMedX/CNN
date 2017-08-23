@@ -51,24 +51,30 @@ if __name__ == '__main__':
     # Load config
     config.load(args.config)
 
-    if config.dataset == "aflw":
+    if config.dataset == 'aflw':
         # Setup AFLW dataset
         train, test = aflw_dataset.setup_aflw(config.aflw_cache_path,
                                               config.aflw_sqlite_path,
                                               config.aflw_imgdir_path,
                                               config.aflw_test_rate)
-    elif config.dataset == "menpo":
+    elif config.dataset == 'menpo':
         train, test = menpo_dataset.setup_menpo(config.menpo_cache_path,
                                                 config.menpo_train_paths,
                                                 config.menpo_test_rate)
+    else:
+        raise Exception('Unknown dataset "{}"' % config.dataset)
 
     # Define a model
-    if args.pretrain:
-        logger.info('Define a R-CNN_Face model')
-        model = models.RCNNFaceModel()
+    if config.dataset == 'menpo':
+        logger.info('Define a HyperFace Menpo model')
+        model = models.HyperFaceMenpoModel()
     else:
-        logger.info('Define a HyperFace model')
-        model = models.HyperFaceModel()
+        if args.pretrain:
+            logger.info('Define a R-CNN_Face model')
+            model = models.RCNNFaceModel()
+        else:
+            logger.info('Define a HyperFace model')
+            model = models.HyperFaceModel()
 
     # Initialize model
     if not args.resume:
