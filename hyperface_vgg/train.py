@@ -65,16 +65,12 @@ if __name__ == '__main__':
         raise Exception('Unknown dataset "{}"' % config.dataset)
 
     # Define a model
-    if config.dataset == 'menpo':
-        logger.info('Define a HyperFace Menpo model')
-        model = models.HyperFaceMenpoModel()
+    if args.pretrain:
+        logger.info('Define a R-CNN_Face model')
+        model = models.RCNNFaceModel()
     else:
-        if args.pretrain:
-            logger.info('Define a R-CNN_Face model')
-            model = models.RCNNFaceModel()
-        else:
-            logger.info('Define a HyperFace model')
-            model = models.HyperFaceModel()
+        logger.info('Define a HyperFace model')
+        model = models.HyperFaceModel(menpo_dataset = (config.dataset == 'menpo'))
 
     # Initialize model
     if not args.resume:
