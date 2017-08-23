@@ -16,7 +16,7 @@ logger.addHandler(NullHandler())
 
 # Constant variables
 N_LANDMARK = 21
-IMG_SIZE = (227, 227)
+IMG_SIZE = (224, 224)
 
 # Python 2 compatibility
 try:

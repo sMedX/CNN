@@ -12,6 +12,8 @@ from logging import getLogger, NullHandler
 logger = getLogger(__name__)
 logger.addHandler(NullHandler())
 
+IMG_SIZE = (224, 224)
+
 def _load_pts(file_path):
     with open(file_path, 'rt') as f:
         lines = f.readlines()
@@ -50,7 +52,10 @@ class MENPO(chainer.dataset.DatasetMixin):
         self.image_points = image_points
 
     def get_example(self, i):
-        return { 'x_img': self.image_files[i],
+        image = cv2.imread(self.image_files[i])
+        image = cv2.resize(image, IMG_SIZE)
+
+        return { 'x_img': image,
                  'points': self.image_points[i] }
 
     def __len__(self):
