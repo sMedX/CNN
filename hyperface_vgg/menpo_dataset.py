@@ -76,10 +76,10 @@ class MENPO(chainer.dataset.DatasetMixin):
         max_y = np.amax(points[:, 1])
         size = max(max_x - min_x, max_y - min_y)
 
-        min_x = max(min_x - size / 4 - random.random() * size / 4, 0)
-        max_x = min(max_x + size / 4 + random.random() * size / 4, image.shape[1])
-        min_y = max(min_y - size / 4 - random.random() * size / 4, 0)
-        max_y = min(max_y + size / 4 + random.random() * size / 4, image.shape[0])
+        min_x = max(min_x  - random.random() * size / 2, 0)
+        max_x = min(max_x  + random.random() * size / 2, image.shape[1])
+        min_y = max(min_y  - random.random() * size / 2, 0)
+        max_y = min(max_y  + random.random() * size / 2, image.shape[0])
         size = min(max(max_x - min_x, max_y - min_y), image.shape[0], image.shape[1])
 
         max_y = min_y + size
