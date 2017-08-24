@@ -1,7 +1,7 @@
 
 import os
 import glob
-import sqlite3
+import random
 import numpy as np
 import cv2
 import chainer
@@ -74,10 +74,32 @@ class MENPO(chainer.dataset.DatasetMixin):
         max_x = np.amax(points[:, 0])
         min_y = np.amin(points[:, 1])
         max_y = np.amax(points[:, 1])
-
         size = max(max_x - min_x, max_y - min_y)
+
+        min_x = max(min_x - size / 4 - random.random() * size / 4, 0)
+        max_x = min(max_x + size / 4 + random.random() * size / 4, image.shape[1])
+        min_y = max(min_y - size / 4 - random.random() * size / 4, 0)
+        max_y = min(max_y + size / 4 + random.random() * size / 4, image.shape[0])
+        size = min(max(max_x - min_x, max_y - min_y), image.shape[0], image.shape[1])
+
         max_y = min_y + size
         max_x = min_x + size
+
+        if max_y >= image.shape[0]:
+            max_y = image.shape[0] - 1
+            min_y = max_y - size
+
+        if max_x >= image.shape[1]:
+            max_x = image.shape[1] - 1
+            min_x = max_x - size
+
+        if min_x < 0:
+            min_x = 0
+            max_x = size
+
+        if min_y < 0:
+            min_y = 0
+            max_y = size
 
         image = image[int(min_y):int(max_y), int(min_x):int(max_x), :].copy()
         points[:, 0] = (points[:, 0] - min_x) / size

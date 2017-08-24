@@ -84,8 +84,9 @@ if __name__ == '__main__':
             # Initialize using pretrained model
             logger.info('Overwrite conv layers using pretraindmodel "{}"'
                         .format(args.pretrainedmodel))
-            pre_model = models.RCNNFaceModel()
-            chainer.serializers.load_npz(args.pretrainedmodel, pre_model)
+            #pre_model = models.RCNNFaceModel()
+            #chainer.serializers.load_npz(args.pretrainedmodel, pre_model)
+            pre_model = CaffeFunction(config.vgg_caffemodel_path)
             copy_layers(pre_model, model)
 
     # Setup GPU
