@@ -130,6 +130,13 @@ def draw_landmark(img, landmark, visibility, color, line_color_scale,
             _draw_circle(img, pt, color, 4, 1)
 
 
+def draw_menpo_landmark(img, landmark, color):
+    landmark = landmark.reshape((68, 2))
+
+    for i in range(68):
+        _draw_circle(img, (landmark[i] * 227), color, 4, -1)
+
+
 def draw_pose(img, pose, size=30, idx=0):
     # parallel projection (something wrong?)
     rotmat = _rotation_matrix(-pose[0], -pose[1], -pose[2])

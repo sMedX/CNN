@@ -18,11 +18,20 @@ logger.addHandler(NullHandler())
 
 def face_img_func(key, entry, viewer):
     # Image conversion
-    img = chainer.cuda.to_cpu(entry['img'][0])   # Use only a first data in the batch
+    img = chainer.cuda.to_cpu(
+        entry['img'][0])   # Use only a first data in the batch
     assert(img.ndim == 3 and (img.shape[0] == 1 or img.shape[0] == 3))
     img = np.transpose(img, (1, 2, 0))
     img = img.copy()  # for safety
     img += 0.5  # [-0.5:0.5] -> [0:1]
+
+    try:
+        menpo_landmark = chainer.cuda.to_cpu(entry['menpo_landmark'][0])
+
+        drawing.draw_menpo_landmark(img, menpo_landmark, (0, 1, 0))
+
+    except KeyError:
+        pass
 
     # Draw
     try:

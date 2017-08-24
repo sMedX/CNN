@@ -152,7 +152,7 @@ if __name__ == '__main__':
         update_interval=progressbar_interval))
 
     # My extensions
-    Sequential Evaluator
+    # Sequential Evaluator
     trainer.extend(
         SequentialEvaluator(test_iter, eval_model, device=config.gpu),
         trigger=test_interval)  # Sequential evaluation for imgviewer in test
