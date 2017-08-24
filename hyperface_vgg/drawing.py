@@ -134,7 +134,7 @@ def draw_menpo_landmark(img, landmark, color):
     landmark = landmark.reshape((68, 2))
 
     for i in range(68):
-        _draw_circle(img, (landmark[i] * 227), color, 4, -1)
+        _draw_circle(img, (landmark[i] * 227), color, 2, -1)
 
 
 def draw_pose(img, pose, size=30, idx=0):

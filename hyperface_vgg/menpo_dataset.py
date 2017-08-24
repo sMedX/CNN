@@ -40,14 +40,11 @@ def _load_menpo_raw(train_dirs):
 
             pts = _load_pts(os.path.splitext(image_file)[0] + '.pts')
 
-            min_y = np.amin(pts[:, 0])
-            max_y = np.amax(pts[:, 0])
-            min_x = np.amin(pts[:, 1])
-            max_x = np.amax(pts[:, 1])
+            height = np.amax(pts[:, 0]) - np.amin(pts[:, 0])
+            width = np.amax(pts[:, 1]) - np.amin(pts[:, 1])
+            size = width * height
 
-            size = (max_x - min_x) * (max_y - min_y)
-
-            if size < 50*50:
+            if size < 50*50 or width < 50 or height < 50:
                 logger.info('Skipping image (too small)')
                 continue
 
@@ -73,16 +70,18 @@ class MENPO(chainer.dataset.DatasetMixin):
         image = cv2.normalize(image, None, -0.5, 0.5, cv2.NORM_MINMAX)
 
         points = self.image_points[i].astype(np.float32)
-        min_y = np.amin(points[:, 0])
-        max_y = np.amax(points[:, 0])
-        min_x = np.amin(points[:, 1])
-        max_x = np.amax(points[:, 1])
+        min_x = np.amin(points[:, 0])
+        max_x = np.amax(points[:, 0])
+        min_y = np.amin(points[:, 1])
+        max_y = np.amax(points[:, 1])
 
         size = max(max_x - min_x, max_y - min_y)
+        max_y = min_y + size
+        max_x = min_x + size
 
-        #image = image[int(min_y):int(size), int(min_y):int(size), :].copy()
-        points[:, 0] = (points[:, 0] - min_y) / size
-        points[:, 1] = (points[:, 1] - min_x) / size
+        image = image[int(min_y):int(max_y), int(min_x):int(max_x), :].copy()
+        points[:, 0] = (points[:, 0] - min_x) / size
+        points[:, 1] = (points[:, 1] - min_y) / size
 
         image = cv2.resize(image, IMG_SIZE)
         image = np.transpose(image, (2, 0, 1))
