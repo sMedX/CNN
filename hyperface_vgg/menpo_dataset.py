@@ -12,7 +12,8 @@ from logging import getLogger, NullHandler
 logger = getLogger(__name__)
 logger.addHandler(NullHandler())
 
-IMG_SIZE = (224, 224)
+IMG_SIZE = (227, 227)
+
 
 def _load_pts(file_path):
     with open(file_path, 'rt') as f:
@@ -27,6 +28,7 @@ def _load_pts(file_path):
     assert len(points) == n_points
 
     return np.array(points)
+
 
 def _load_menpo_raw(train_dirs):
     image_files = []
@@ -46,20 +48,48 @@ def _load_menpo_raw(train_dirs):
 
     return image_files, image_points
 
+
 class MENPO(chainer.dataset.DatasetMixin):
+
     def __init__(self, image_files, image_points):
         self.image_files = image_files
         self.image_points = image_points
 
     def get_example(self, i):
-        image = cv2.imread(self.image_files[i])
-        image = cv2.resize(image, IMG_SIZE)
+        image_file = self.image_files[i]
 
-        return { 'x_img': image,
-                 'points': self.image_points[i] }
+        original_image = cv2.imread(image_file)
+
+        image = original_image
+        image = cv2.resize(image, IMG_SIZE)
+        image = image.astype(np.float32)
+        image = cv2.normalize(image, None, -0.5, 0.5, cv2.NORM_MINMAX)
+        image = np.transpose(image, (2, 0, 1))
+
+        points = self.image_points[i].astype(np.float32)
+        points *= np.array([1.0 / original_image.shape[1], 1.0 / original_image.shape[0]])
+
+        if points.shape[0] == 39:
+            points = np.concatenate((points,
+                                     np.zeros((68 - 39, 2), dtype = np.float32)))
+            mask = np.concatenate((np.ones((39, 2), dtype = np.float32),
+                                   np.zeros((68 - 39, 2), dtype = np.float32)))
+        elif points.shape[0] == 68:
+            mask = np.ones((68, 2), dtype = np.float32)
+        else:
+            raise Exception(
+                'Image "{}" has unknown landmakrs with {} points'.format(image_file, points.shape))
+
+        points = points.reshape(-1)
+        mask = mask.reshape(-1)
+
+        return {'x_img': image,
+                't_menpo_landmark': points,
+                'm_menpo_landmark': mask}
 
     def __len__(self):
         return self.image_files.shape[0]
+
 
 def setup_menpo(cache_path, train_dirs, test_rate):
     logger.info('Try to load MENPO cache from "{}"'.format(cache_path))
@@ -76,14 +106,14 @@ def setup_menpo(cache_path, train_dirs, test_rate):
         n_train = int(image_files.shape[0] * (1.0 - test_rate))
 
         logger.info('Save MENPO cache to "{}"'.format(cache_path))
-        np.savez(cache_path, image_files = image_files,
-                 image_points = image_points,
-                 order = order,
-                 n_train = n_train)
+        np.savez(cache_path, image_files=image_files,
+                 image_points=image_points,
+                 order=order,
+                 n_train=n_train)
 
     menpo = MENPO(image_files, image_points)
 
-    train, test = chainer.datasets.split_dataset(menpo, n_train, order = order)
+    train, test = chainer.datasets.split_dataset(menpo, n_train, order=order)
     logger.info('MENPO datasets (n_train:{}, n_test:{})'.
                 format(len(train), len(test)))
 

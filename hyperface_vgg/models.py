@@ -13,7 +13,7 @@ logger.addHandler(NullHandler())
 # Constant variables
 N_AFLW_LANDMARK = 42
 N_MENPO_LANDMARK = 68
-IMG_SIZE = (224, 224)
+IMG_SIZE = (227, 227)
 
 
 def _disconnect(x):
@@ -62,19 +62,8 @@ class HyperFaceModel(chainer.Chain):
             conv_all=L.Convolution2D(1280, 192, 1, stride=1, pad=0),
             fc_full=L.Linear(8 * 8 * 192, 3072),
 
-            fc_detection1=L.Linear(3072, 512),
-            fc_detection2=L.Linear(512, 2),
-            fc_landmarks1=L.Linear(3072, 512),
-            fc_landmarks2=L.Linear(512, 42),
-            fc_visibility1=L.Linear(3072, 512),
-            fc_visibility2=L.Linear(512, 21),
-            fc_pose1=L.Linear(3072, 512),
-            fc_pose2=L.Linear(512, 3),
-            fc_gender1=L.Linear(3072, 512),
-            fc_gender2=L.Linear(512, 2),
-
-            fc_menpo_landmarks=L.Linear(3072, 512),
-            fc_menpo_landmarks2=L.Linear(512, 68),
+            fc_menpo_landmark1=L.Linear(3072, 512),
+            fc_menpo_landmark2=L.Linear(512, N_MENPO_LANDMARK * 2),
         )
         self.menpo_dataset = menpo_dataset
         self.train = True
@@ -83,9 +72,7 @@ class HyperFaceModel(chainer.Chain):
         assert(len(loss_weights) == 5)
         self.loss_weights = loss_weights
 
-    def __call__(self, x_img, t_detection=None, t_landmark=None,
-                 t_visibility=None, t_pose=None, t_gender=None,
-                 m_landmark=None, m_visibility=None, m_pose=None):
+    def __call__(self, x_img, t_menpo_landmark=None, m_menpo_landmark=None):
         # VGG
         h = F.relu(self.conv1_1(x_img))
         h = F.relu(self.conv1_2(h))
@@ -120,87 +107,31 @@ class HyperFaceModel(chainer.Chain):
         with chainer.using_config('train', self.train):
             h = F.dropout(h)
 
-        if self.menpo_dataset:
-            h_detection = F.relu(self.fc_detection1(h))
-            with chainer.using_config('train', self.train):
-                h_detection = F.dropout(h_detection)
-            h_detection = self.fc_detection2(h_detection)
-            h_landmark = F.relu(self.fc_landmarks1(h))
-            with chainer.using_config('train', self.train):
-                h_landmark = F.dropout(h_landmark)
-            h_landmark = self.fc_landmarks2(h_landmark)
-            h_visibility = F.relu(self.fc_visibility1(h))
-            with chainer.using_config('train', self.train):
-                h_visibility = F.dropout(h_visibility)
-            h_visibility = self.fc_visibility2(h_visibility)
-            h_pose = F.relu(self.fc_pose1(h))
-            with chainer.using_config('train', self.train):
-                h_pose = F.dropout(h_pose)
-            h_pose = self.fc_pose2(h_pose)
-            h_gender = F.relu(self.fc_gender1(h))
-            with chainer.using_config('train', self.train):
-                h_gender = F.dropout(h_gender)
-            h_gender = self.fc_gender2(h_gender)
-        else:
-            h_menpo_landmark = F.relu(self.fc_menpo_landmarks1(h))
-            with chainer.using_config('train', self.train):
-                h_landmark = F.dropout(h_menpo_landmark)
-            h_menpo_landmark = self.fc_menpo_landmarks2(h_menpo_landmark)
+        h_menpo_landmark = F.relu(self.fc_menpo_landmark1(h))
+        with chainer.using_config('train', self.train):
+            h_landmark = F.dropout(h_menpo_landmark)
+        h_menpo_landmark = self.fc_menpo_landmark2(h_menpo_landmark)
 
         # Mask and Loss
         if self.backward:
             # Landmark masking with visibility
-            m_landmark_ew = F.stack((t_visibility, t_visibility), axis=2)
-            m_landmark_ew = F.reshape(m_landmark_ew, (-1, N_AFLW_LANDMARK * 2))
-
-            # Masking
-            h_landmark *= _disconnect(m_landmark)
-            t_landmark *= _disconnect(m_landmark)
-            h_landmark *= _disconnect(m_landmark_ew)
-            t_landmark *= _disconnect(m_landmark_ew)
-            h_visibility *= _disconnect(m_visibility)
-            t_visibility *= _disconnect(m_visibility)
-            h_pose *= _disconnect(m_pose)
-            t_pose *= _disconnect(m_pose)
+            h_menpo_landmark *= _disconnect(m_menpo_landmark)
+            t_menpo_landmark *= _disconnect(m_menpo_landmark)
 
             # Loss
-            loss_detection = F.softmax_cross_entropy(h_detection, t_detection)
-            loss_landmark = F.mean_squared_error(h_landmark, t_landmark)
-            loss_visibility = F.mean_squared_error(h_visibility, t_visibility)
-            loss_pose = F.mean_squared_error(h_pose, t_pose)
-            loss_gender = F.softmax_cross_entropy(h_gender, t_gender)
+            loss_landmark = F.mean_squared_error(
+                h_menpo_landmark, t_menpo_landmark)
 
-            # Loss scaling
-            loss_detection *= self.loss_weights[0]
-            loss_landmark *= self.loss_weights[1]
-            loss_visibility *= self.loss_weights[2]
-            loss_pose *= self.loss_weights[3]
-            loss_gender *= self.loss_weights[4]
-
-            loss = (loss_detection + loss_landmark + loss_visibility +
-                    loss_pose + loss_gender)
-
-        # Prediction (the same shape as t_**, and [0:1])
-        h_detection = F.softmax(h_detection)[:, 1]  # ([[y, n]] -> [d])
-        h_gender = F.softmax(h_gender)[:, 1]  # ([[m, f]] -> [g])
+            loss = loss_landmark
 
         if self.report:
             if self.backward:
                 # Report losses
-                chainer.report({'loss': loss,
-                                'loss_detection': loss_detection,
-                                'loss_landmark': loss_landmark,
-                                'loss_visibility': loss_visibility,
-                                'loss_pose': loss_pose,
-                                'loss_gender': loss_gender}, self)
+                chainer.report({'loss': loss}, self)
 
             # Report results
-            predict_data = {'img': x_img, 'detection': h_detection,
-                            'landmark': h_landmark, 'visibility': h_visibility,
-                            'pose': h_pose, 'gender': h_gender}
-            teacher_data = {'img': x_img, 'detection': t_detection,
-                            'landmark': t_landmark, 'visibility': t_visibility,
-                            'pose': t_pose, 'gender': t_gender}
+            predict_data = {'img': x_img, 'menpo_landmark': h_menpo_landmark}
+            teacher_data = {'img': x_img, 'menpo_landmark': t_menpo_landmark}
             chainer.report({'predict': predict_data}, self)
             chainer.report({'teacher': teacher_data}, self)
 
@@ -214,9 +145,8 @@ class HyperFaceModel(chainer.Chain):
         if self.backward:
             return loss
         else:
-            return {'img': x_img, 'detection': h_detection,
-                    'landmark': h_landmark, 'visibility': h_visibility,
-                    'pose': h_pose, 'gender': h_gender}
+            return {'img': x_img, 'menpo_landmark': h_menpo_landmark}
+
 
 class RCNNFaceModel(chainer.Chain):
 
