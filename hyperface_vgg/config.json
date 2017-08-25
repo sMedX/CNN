@@ -15,7 +15,7 @@
     "gpu": 0,
     "n_loaders_train": 7,
     "n_loaders_test": 1,
-    "n_epoch": 20,
+    "n_epoch": 200,
     "batchsize": 10,
     "port_face": 8888,
     "port_weight": 8889,
