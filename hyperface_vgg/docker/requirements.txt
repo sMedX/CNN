@@ -1,0 +1,7 @@
+chainer==2.0.0
+opencv-python==3.4.0.12
+dlib==19.9.0
+flask==0.12.2
+flask_socketio==2.9.3
+cupy==1.0.1
+matplotlib==1.5.3
