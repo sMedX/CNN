@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd ..
+nvidia-docker build -t emotions -f docker/Dockerfile .

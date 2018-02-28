@@ -3,6 +3,9 @@
     Из родительской директории (hyperface_vgg) выполните команду:
     nvidia-docker build -t emotions -f docker/Dockerfile .
 
+    или запустите файл ./create_docker_image
+  
+
 2. Подготовка данных
 
     Директория с данными должна иметь следующую структуру
@@ -67,6 +70,8 @@
         -p 8890:8890 \
         --mount type=bind,source="$(pwd)",target=/app/data \
         emotions
+
+    или переместите файл ./run_docker_image в директорию с данными и запустите его оттуда
             
 4. После запуска прогресс обучения можно наблюдать на
 

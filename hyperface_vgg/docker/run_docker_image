@@ -1,0 +1,8 @@
+#!/bin/bash
+
+nvidia-docker run -d \
+    --name=emotions \
+    -p 8888:8888 \
+    -p 8890:8890 \
+    --mount type=bind,source="$(pwd)",target=/app/data \
+    emotions
